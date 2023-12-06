@@ -39,6 +39,8 @@ $Job = Register-FileSystemWatcher $GitFolder -Action {
 }
 
 try {
+    Write-GitLog
+
     while ($True) {
         $IsKeyDown = [System.Console]::KeyAvailable;
         $Host.UI.RawUI.FlushInputBuffer()
