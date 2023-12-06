@@ -16,8 +16,19 @@ Function Register-FileSystemWatcher {
     Register-ObjectEvent $Watcher -EventName "Deleted" -Action $Action
 }
 
+$global:Paused = $False
 $GitFolder = ".git"
-Register-FileSystemWatcher $GitFolder -Action {
-    Write-Host $Event.SourceEventArgs.ChangeType
-    Write-Host $Event.SourceEventArgs.FullPath
+$Job = Register-FileSystemWatcher $GitFolder -Action {
+    # Write-Host $Event.SourceEventArgs.ChangeType
+    # Write-Host $Event.SourceEventArgs.FullPath
+    $global:Paused = $False
+}
+
+while ($True) {
+    if (!($global:Paused)) {
+        Clear-Host
+        git --no-pager log --graph --oneline --branches -22
+        $global:Paused = $True
+    }
+    Start-Sleep -Seconds 1
 }
