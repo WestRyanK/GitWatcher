@@ -30,8 +30,11 @@ Function Write-GitLog {
 $global:IsUpdateAvailable = $False
 $GitFolder = ".git"
 $Job = Register-FileSystemWatcher $GitFolder -Action {
-    # Write-Host $Event.SourceEventArgs.ChangeType
-    # Write-Host $Event.SourceEventArgs.FullPath
+    $FileName = Split-Path $Event.SourceEventArgs.FullPath -Leaf
+    if ($FileName -like "*.lock") {
+        return
+    }
+
     $global:IsUpdateAvailable = $True
 }
 
