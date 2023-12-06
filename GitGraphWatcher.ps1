@@ -16,7 +16,8 @@ Function Register-FileSystemWatcher {
     Register-ObjectEvent $Watcher -EventName "Deleted" -Action $Action
 }
 
-Register-FileSystemWatcher (Get-Location) -Action {
+$GitFolder = ".git"
+Register-FileSystemWatcher $GitFolder -Action {
     Write-Host $Event.SourceEventArgs.ChangeType
     Write-Host $Event.SourceEventArgs.FullPath
 }
