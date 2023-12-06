@@ -54,13 +54,20 @@ $Job = Register-FileSystemWatcher $WatchPath -Action {
 try {
     Write-GitLog $Path
 
-    while ($True) {
-        $IsKeyDown = [System.Console]::KeyAvailable;
+    $Continue = $True
+    while ($Continue) {
         $Host.UI.RawUI.FlushInputBuffer()
-        Start-Sleep -Seconds .25
+        Start-Sleep -Seconds .05
+        $IsKeyDown = [System.Console]::KeyAvailable;
         if ($IsKeyDown) {
-            Write-GitLog $Path -Page
-            Write-GitLog $Path
+            $PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            if ($PressedKey.Character -eq "q") {
+                $Continue = $False
+            }
+            else {
+                Write-GitLog $Path -Page
+                Write-GitLog $Path
+            }
         }
         if ($global:IsUpdateAvailable) {
             Write-GitLog $Path
