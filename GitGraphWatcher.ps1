@@ -55,6 +55,7 @@ try {
         Start-Sleep -Seconds .25
         if ($IsKeyDown) {
             Write-GitLog $Path -Page
+            Write-GitLog $Path
         }
         if ($global:IsUpdateAvailable) {
             Write-GitLog $Path
