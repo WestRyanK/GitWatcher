@@ -1,12 +1,10 @@
-Function Register-FileSystemWatcher {
-    param (
-        [string] $Folder,
-        [scriptblock] $Action
-    )
+param([string] $Path)
 
-    $Folder = $Folder | Resolve-Path
+Function Register-FileSystemWatcher {
+    param ( [string] $Path, [scriptblock] $Action)
+
     $Filter = "*.*"
-    $Watcher = New-Object System.IO.FileSystemWatcher $Folder, $Filter -Property @{
+    $Watcher = New-Object System.IO.FileSystemWatcher $Path, $Filter -Property @{
         IncludeSubdirectories = $True
         EnableRaisingEvents = $True
     }
@@ -17,39 +15,49 @@ Function Register-FileSystemWatcher {
 }
 
 Function Write-GitLog {
-    param([switch] $Page)
+    param([string] $Path, [switch] $Page)
+
     Clear-Host
     if ($Page) {
-        git log --graph --oneline --branches
+        git -C "$Path" log --graph --oneline --branches
     }
     else {
-        git --no-pager log --graph --oneline --branches -22
+        git -C "$Path" --no-pager log --graph --oneline --branches -22
     }
 }
 
+
+
 $global:IsUpdateAvailable = $False
+
+if ([String]::IsNullOrWhiteSpace($Path)) {
+    $Path = "."
+}
+$Path = $Path | Resolve-Path
 $GitFolder = ".git"
-$Job = Register-FileSystemWatcher $GitFolder -Action {
+$WatchPath = [System.IO.Path]::Combine($Path, $GitFolder)
+
+$Job = Register-FileSystemWatcher $WatchPath -Action {
     $FileName = Split-Path $Event.SourceEventArgs.FullPath -Leaf
     if ($FileName -like "*.lock") {
         return
     }
-
     $global:IsUpdateAvailable = $True
 }
 
+
 try {
-    Write-GitLog
+    Write-GitLog $Path
 
     while ($True) {
         $IsKeyDown = [System.Console]::KeyAvailable;
         $Host.UI.RawUI.FlushInputBuffer()
         Start-Sleep -Seconds .25
         if ($IsKeyDown) {
-            Write-GitLog -Page
+            Write-GitLog $Path -Page
         }
         if ($global:IsUpdateAvailable) {
-            Write-GitLog
+            Write-GitLog $Path
             $global:IsUpdateAvailable = $False
         }
     }
