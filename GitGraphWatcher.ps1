@@ -35,15 +35,22 @@ $Job = Register-FileSystemWatcher $GitFolder -Action {
     $global:IsUpdateAvailable = $True
 }
 
-while ($True) {
-    $IsKeyDown = [System.Console]::KeyAvailable;
-    $Host.UI.RawUI.FlushInputBuffer()
-    Start-Sleep -Seconds .25
-    if ($IsKeyDown) {
-        Write-GitLog -Page
+try {
+    while ($True) {
+        $IsKeyDown = [System.Console]::KeyAvailable;
+        $Host.UI.RawUI.FlushInputBuffer()
+        Start-Sleep -Seconds .25
+        if ($IsKeyDown) {
+            Write-GitLog -Page
+        }
+        if ($global:IsUpdateAvailable) {
+            Write-GitLog
+            $global:IsUpdateAvailable = $False
+        }
     }
-    if ($global:IsUpdateAvailable) {
-        Write-GitLog
-        $global:IsUpdateAvailable = $False
-    }
+}
+finally {
+    Get-EventSubscriber -Force | Unregister-Event -Force
+    Get-Job | Stop-Job
+    Get-Job | Remove-Job
 }
