@@ -22,7 +22,12 @@ Function Write-GitLog {
         git -C "$Path" log --graph --oneline --branches
     }
     else {
-        git -C "$Path" --no-pager log --graph --oneline --branches -22
+        $CommitCount = $Host.UI.RawUI.WindowSize.Height
+        $LogRows = git -C "$Path" --no-pager log --graph --oneline --branches -$CommitCount
+        $MaxRowCount = $CommitCount - 1
+        $LogRows = $LogRows[0..($MaxRowCount - 1)]
+        $LogString = $LogRows | Join-String -Separator "`n"
+        Write-Host $LogString
     }
 }
 
