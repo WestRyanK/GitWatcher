@@ -23,7 +23,7 @@ Function Write-GitLog {
     }
     else {
         $CommitCount = $Host.UI.RawUI.WindowSize.Height
-        $LogRows = git -C "$Path" --no-pager log --graph --oneline --branches --color=always -$CommitCount
+        $LogRows = git -C "$Path" --no-pager log --graph --oneline --branches --decorate --color=always -$CommitCount
         $MaxRowCount = $CommitCount - 1
         $LogRows = $LogRows[0..($MaxRowCount - 1)]
         $LogString = $LogRows | Join-String -Separator "`n"
