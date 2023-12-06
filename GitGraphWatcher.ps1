@@ -16,19 +16,34 @@ Function Register-FileSystemWatcher {
     Register-ObjectEvent $Watcher -EventName "Deleted" -Action $Action
 }
 
-$global:Paused = $False
+Function Write-GitLog {
+    param([switch] $Page)
+    Clear-Host
+    if ($Page) {
+        git log --graph --oneline --branches
+    }
+    else {
+        git --no-pager log --graph --oneline --branches -22
+    }
+}
+
+$global:IsUpdateAvailable = $False
 $GitFolder = ".git"
 $Job = Register-FileSystemWatcher $GitFolder -Action {
     # Write-Host $Event.SourceEventArgs.ChangeType
     # Write-Host $Event.SourceEventArgs.FullPath
-    $global:Paused = $False
+    $global:IsUpdateAvailable = $True
 }
 
 while ($True) {
-    if (!($global:Paused)) {
-        Clear-Host
-        git --no-pager log --graph --oneline --branches -22
-        $global:Paused = $True
+    $IsKeyDown = [System.Console]::KeyAvailable;
+    $Host.UI.RawUI.FlushInputBuffer()
+    Start-Sleep -Seconds .25
+    if ($IsKeyDown) {
+        Write-GitLog -Page
     }
-    Start-Sleep -Seconds 1
+    if ($global:IsUpdateAvailable) {
+        Write-GitLog
+        $global:IsUpdateAvailable = $False
+    }
 }
