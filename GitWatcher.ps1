@@ -1,6 +1,7 @@
 param(
     [string] $Path,
-    [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph"
+    [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
+    [double] $UpdateDelaySeconds = 0.5
 )
 
 Function Register-FileSystemWatcher {
@@ -68,7 +69,7 @@ Function Write-Git {
 
 
 
-$global:IsUpdateAvailable = $False
+$global:LastChange = $null
 
 if ([String]::IsNullOrWhiteSpace($Path)) {
     $Path = "."
@@ -87,7 +88,7 @@ $Job = Register-FileSystemWatcher $WatchPath -Action {
     if ($FileName -like "*.lock") {
         return
     }
-    $global:IsUpdateAvailable = $True
+    $global:LastChange = Get-Date
 }
 
 
@@ -109,9 +110,9 @@ try {
                 Write-Git $Path $GitCommand
             }
         }
-        if ($global:IsUpdateAvailable) {
+        if ($null -ne $global:LastChange -and (New-TimeSpan -Start $global:LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
             Write-Git $Path $GitCommand
-            $global:IsUpdateAvailable = $False
+            $global:LastChange = $null
         }
     }
 }
