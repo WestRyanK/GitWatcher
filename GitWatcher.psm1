@@ -73,6 +73,12 @@ Function Wait-FileSystemChange {
     return $Result.TimedOut -eq $False -and $Result.Name -notlike "*.lock"
 }
 
+Function Test-GitPath {
+    param([string] $Path)
+    ($Result = (git -C $Path rev-parse --is-inside-work-tree)) 2> $null
+    return $Result -eq "true"
+}
+
 
 Function Watch-Git {
     param(
@@ -87,12 +93,12 @@ Function Watch-Git {
     }
     $Path = $Path | Resolve-Path
     $RepoName = $Path | Split-Path -Leaf
-    if ($GitCommand -eq "Graph") {
-        $WatchPath = [System.IO.Path]::Combine($Path, ".git")
+    if (!(Test-GitPath $Path)) {
+        Write-Error "not a git repository: $Path"
+        return
     }
-    else {
-        $WatchPath = $Path
-    }
+
+    $WatchPath = if ($GitCommand -eq "Graph") { [System.IO.Path]::Combine($Path, ".git") } else { $Path }
     Initialize-FileSystemWatcher $WatchPath
 
     $LastChange = [DateTime]::MinValue
