@@ -14,6 +14,16 @@ Function Register-FileSystemWatcher {
     Register-ObjectEvent $Watcher -EventName "Deleted" -Action $Action
 }
 
+Function Write-ClippedCommandOutput {
+    param([ScriptBlock] $Command)
+
+    $MaxLines = $Host.UI.RawUI.WindowSize.Height - 1
+    $Lines = Invoke-Command $Command -ArgumentList $MaxLines
+    $ClippedLines = $Lines[0..($MaxLines - 1)]
+    $Output = $ClippedLines | Join-String -Separator "`n"
+    Write-Host $Output
+}
+
 Function Write-GitLog {
     param([string] $Path, [switch] $Page)
 
@@ -22,12 +32,9 @@ Function Write-GitLog {
         git -C "$Path" log --graph --oneline --branches
     }
     else {
-        $CommitCount = $Host.UI.RawUI.WindowSize.Height
-        $LogRows = git -C "$Path" --no-pager log --graph --oneline --branches --decorate --color=always -$CommitCount
-        $MaxRowCount = $CommitCount - 1
-        $LogRows = $LogRows[0..($MaxRowCount - 1)]
-        $LogString = $LogRows | Join-String -Separator "`n"
-        Write-Host $LogString
+        Write-ClippedCommandOutput {
+            git -C "$Path" --no-pager log --graph --oneline --branches --decorate --color=always -$MaxLines
+        }
     }
 }
 
