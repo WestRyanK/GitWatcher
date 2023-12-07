@@ -25,10 +25,11 @@ Function Write-ClippedCommandOutput {
 }
 
 Function Write-GitGraph {
-    param([string] $Path, [switch] $Page)
+    param([string] $Path, [switch] $Paginate)
+
 
     Clear-Host
-    if ($Page) {
+    if ($Paginate) {
         git -C "$Path" log --graph --oneline --branches
     }
     else {
@@ -72,7 +73,7 @@ try {
                 $Continue = $False
             }
             else {
-                Write-GitGraph $Path -Page
+                Write-GitGraph $Path -Paginate
                 Write-GitGraph $Path
             }
         }
