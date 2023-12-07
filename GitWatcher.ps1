@@ -25,14 +25,13 @@ Function Write-ClippedCommandOutput {
     $Lines = Invoke-Command $Command -ArgumentList $MaxLines
     $ClippedLines = $Lines[0..($MaxLines - 1)]
     $Output = $ClippedLines | Join-String -Separator "`n"
+    Clear-Host
     Write-Host $Output
 }
 
 Function Write-GitGraph {
     param([string] $Path, [switch] $Paginate)
 
-
-    Clear-Host
     if ($Paginate) {
         git -C "$Path" log --graph --oneline --branches
     }
@@ -46,7 +45,6 @@ Function Write-GitGraph {
 Function Write-GitStatus {
     param([string] $Path, [switch] $Paginate)
 
-    Clear-Host
     if ($Paginate) {
         git -c color.status=always -C "$Path" -p status
     }
