@@ -1,4 +1,7 @@
-param([string] $Path)
+param(
+    [string] $Path,
+    [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph"
+)
 
 Function Register-FileSystemWatcher {
     param ( [string] $Path, [scriptblock] $Action)
@@ -39,6 +42,30 @@ Function Write-GitGraph {
     }
 }
 
+Function Write-GitStatus {
+    param([string] $Path, [switch] $Paginate)
+
+    Clear-Host
+    if ($Paginate) {
+        git -c color.status=always -C "$Path" -p status
+    }
+    else {
+        Write-ClippedCommandOutput {
+            git -c color.status=always -C "$Path" status
+        }
+    }
+}
+
+Function Write-Git {
+    param([string] $Path, [switch] $Paginate, $GitCommand)
+    if ($GitCommand -eq "Graph") {
+        Write-GitGraph -Path $Path -Paginate:$Paginate
+    }
+    elseif ($GitCommand -eq "Status") {
+        Write-GitStatus -Path $Path -Paginate:$Paginate
+    }
+}
+
 
 
 $global:IsUpdateAvailable = $False
@@ -47,8 +74,13 @@ if ([String]::IsNullOrWhiteSpace($Path)) {
     $Path = "."
 }
 $Path = $Path | Resolve-Path
-$GitFolder = ".git"
-$WatchPath = [System.IO.Path]::Combine($Path, $GitFolder)
+if ($GitCommand -eq "Graph") {
+    $GitFolder = ".git"
+    $WatchPath = [System.IO.Path]::Combine($Path, $GitFolder)
+}
+else {
+    $WatchPath = $Path
+}
 
 $Job = Register-FileSystemWatcher $WatchPath -Action {
     $FileName = Split-Path $Event.SourceEventArgs.FullPath -Leaf
@@ -60,7 +92,7 @@ $Job = Register-FileSystemWatcher $WatchPath -Action {
 
 
 try {
-    Write-GitGraph $Path
+    Write-Git $Path $GitCommand
 
     $Continue = $True
     while ($Continue) {
@@ -73,12 +105,12 @@ try {
                 $Continue = $False
             }
             else {
-                Write-GitGraph $Path -Paginate
-                Write-GitGraph $Path
+                Write-Git $Path -Paginate $GitCommand
+                Write-Git $Path $GitCommand
             }
         }
         if ($global:IsUpdateAvailable) {
-            Write-GitGraph $Path
+            Write-Git $Path $GitCommand
             $global:IsUpdateAvailable = $False
         }
     }

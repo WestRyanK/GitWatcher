@@ -10,6 +10,20 @@
             "request": "launch",
             "script": "${file}",
             "args": ["${env:PATHARG}"]
+        },
+        {
+            "name": "GitWatcher: Graph",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "./GitWatcher.ps1",
+            "args": ["${env:PATHARG}", "-Graph"]
+        },
+        {
+            "name": "GitWatcher: Status",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "./GitWatcher.ps1",
+            "args": ["${env:PATHARG}", "-GitCommand", "Status"]
         }
     ]
 }
