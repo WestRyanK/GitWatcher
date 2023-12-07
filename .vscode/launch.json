@@ -24,6 +24,12 @@
             "request": "launch",
             "script": "./GitWatcher.Test.ps1",
             "args": ["${env:PATHARG}", "-GitCommand", "Status"]
+        },
+        {
+            "name": "Install",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "./Install.ps1"
         }
     ]
 }
