@@ -75,8 +75,6 @@ Function Watch-Git {
         [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m"
     )
 
-    $LastChange = $null
-
     if ([String]::IsNullOrWhiteSpace($Path)) {
         $Path = "."
     }
@@ -90,10 +88,15 @@ Function Watch-Git {
     }
     Initialize-FileSystemWatcher $WatchPath
 
-	Write-Git $Path $LiveMessage $RepoName $GitCommand
-
+    $LastChange = [DateTime]::MinValue
     $Continue = $True
     while ($Continue) {
+        $IsUpdateAvailable = $null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds
+        if ($IsUpdateAvailable) {
+			Write-Git $Path $LiveMessage $RepoName $GitCommand
+			$LastChange = $null
+		}
+
         $Host.UI.RawUI.FlushInputBuffer()
 
         if (Wait-FileSystemChange) {
@@ -110,10 +113,6 @@ Function Watch-Git {
 				Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate
 				Write-Git $Path $LiveMessage $RepoName $GitCommand
 			}
-		}
-		if ($null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
-			Write-Git $Path $LiveMessage $RepoName $GitCommand
-			$LastChange = $null
 		}
 	}
 }
