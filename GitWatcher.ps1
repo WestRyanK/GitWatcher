@@ -2,7 +2,7 @@ param(
     [string] $Path,
     [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
     [double] $UpdateDelaySeconds = 0.5,
-    [string] $LiveMessage = "`e[32m(● Live)`e[0m"
+    [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m"
 )
 
 Function Write-ClippedCommandOutput {
@@ -43,7 +43,7 @@ Function Write-GitStatus {
 }
 
 Function Write-Git {
-    param([string] $Path, [string] $LiveMessage, [string] $GitCommand, [switch] $Paginate)
+    param([string] $Path, [string] $LiveMessage, [string] $RepoName, [string] $GitCommand, [switch] $Paginate)
     if ($GitCommand -eq "Graph") {
         Write-GitGraph -Path $Path -Paginate:$Paginate
     }
@@ -51,7 +51,8 @@ Function Write-Git {
         Write-GitStatus -Path $Path -Paginate:$Paginate
     }
     if (!$Paginate) {
-        Write-Host $LiveMessage -NoNewline
+        $FormattedMessage = $LiveMessage -f $RepoName
+        Write-Host $FormattedMessage -NoNewline
     }
 }
 
@@ -81,6 +82,7 @@ if ([String]::IsNullOrWhiteSpace($Path)) {
     $Path = "."
 }
 $Path = $Path | Resolve-Path
+$RepoName = $Path | Split-Path -Leaf
 if ($GitCommand -eq "Graph") {
     $WatchPath = [System.IO.Path]::Combine($Path, ".git")
 }
@@ -89,7 +91,7 @@ else {
 }
 Initialize-FileSystemWatcher $WatchPath
 
-Write-Git $Path $LiveMessage $GitCommand
+Write-Git $Path $LiveMessage $RepoName $GitCommand
 
 $Continue = $True
 while ($Continue) {
@@ -106,12 +108,12 @@ while ($Continue) {
             $Continue = $False
         }
         else {
-            Write-Git $Path $LiveMessage $GitCommand -Paginate
-            Write-Git $Path $LiveMessage $GitCommand
+            Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate
+            Write-Git $Path $LiveMessage $RepoName $GitCommand
         }
     }
     if ($null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
-        Write-Git $Path $LiveMessage $GitCommand
+        Write-Git $Path $LiveMessage $RepoName $GitCommand
         $LastChange = $null
     }
 }
