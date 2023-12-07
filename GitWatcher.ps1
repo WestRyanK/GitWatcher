@@ -5,20 +5,6 @@ param(
     [string] $LiveMessage = "`e[32m(● Live)`e[0m"
 )
 
-Function Register-FileSystemWatcher {
-    param ( [string] $Path, [scriptblock] $Action)
-
-    $Filter = "*.*"
-    $Watcher = New-Object System.IO.FileSystemWatcher $Path, $Filter -Property @{
-        IncludeSubdirectories = $True
-        EnableRaisingEvents = $True
-    }
-
-    Register-ObjectEvent $Watcher -EventName "Changed" -Action $Action
-    Register-ObjectEvent $Watcher -EventName "Created" -Action $Action
-    Register-ObjectEvent $Watcher -EventName "Deleted" -Action $Action
-}
-
 Function Write-ClippedCommandOutput {
     param([ScriptBlock] $Command)
 
@@ -71,7 +57,7 @@ Function Write-Git {
 
 
 
-$global:LastChange = $null
+$LastChange = $null
 
 if ([String]::IsNullOrWhiteSpace($Path)) {
     $Path = "."
@@ -85,41 +71,39 @@ else {
     $WatchPath = $Path
 }
 
-$Job = Register-FileSystemWatcher $WatchPath -Action {
-    $FileName = Split-Path $Event.SourceEventArgs.FullPath -Leaf
-    if ($FileName -like "*.lock") {
-        return
-    }
-    $global:LastChange = Get-Date
+$Watcher = New-Object System.IO.FileSystemWatcher $WatchPath -Property @{
+    IncludeSubdirectories = $True
+    EnableRaisingEvents = $True
+    Filter = "*.*"
 }
+$ChangeTypes = [System.IO.WatcherChangeTypes]::Created,[System.IO.WatcherChangeTypes]::Changed,[System.IO.WatcherChangeTypes]::Deleted,[System.IO.WatcherChangeTypes]::Renamed
+$Timeout = New-TimeSpan -Milliseconds 100
 
 
-try {
-    Write-Git $Path $LiveMessage $GitCommand
+Write-Git $Path $LiveMessage $GitCommand
 
-    $Continue = $True
-    while ($Continue) {
-        $Host.UI.RawUI.FlushInputBuffer()
-        Start-Sleep -Seconds .05
-        $IsKeyDown = [System.Console]::KeyAvailable;
-        if ($IsKeyDown) {
-            $PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            if ($PressedKey.Character -eq "q") {
-                $Continue = $False
-            }
-            else {
-                Write-Git $Path $LiveMessage $GitCommand -Paginate
-                Write-Git $Path $LiveMessage $GitCommand
-            }
+$Continue = $True
+while ($Continue) {
+    $Host.UI.RawUI.FlushInputBuffer()
+
+    $Result = $Watcher.WaitForChanged($ChangeTypes, $Timeout)
+    if ($Result.TimedOut -eq $False -and $Result.Name -notlike "*.lock") {
+        $LastChange = Get-Date
+    }
+
+    $IsKeyDown = [System.Console]::KeyAvailable;
+    if ($IsKeyDown) {
+        $PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        if ($PressedKey.Character -eq "q") {
+            $Continue = $False
         }
-        if ($null -ne $global:LastChange -and (New-TimeSpan -Start $global:LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
+        else {
+            Write-Git $Path $LiveMessage $GitCommand -Paginate
             Write-Git $Path $LiveMessage $GitCommand
-            $global:LastChange = $null
         }
     }
-}
-finally {
-    Get-EventSubscriber -Force | Unregister-Event -Force
-    Get-Job | Stop-Job
-    Get-Job | Remove-Job
+    if ($null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
+        Write-Git $Path $LiveMessage $GitCommand
+        $LastChange = $null
+    }
 }
