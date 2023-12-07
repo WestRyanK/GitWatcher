@@ -117,3 +117,5 @@ Function Watch-Git {
 		}
 	}
 }
+
+Export-ModuleMember -Function Watch-Git
