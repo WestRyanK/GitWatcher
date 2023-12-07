@@ -55,6 +55,24 @@ Function Write-Git {
     }
 }
 
+Function Initialize-FileSystemWatcher {
+    param([string] $Path)
+
+    $script:Watcher = New-Object System.IO.FileSystemWatcher $WatchPath -Property @{
+        IncludeSubdirectories = $True
+        EnableRaisingEvents = $True
+        Filter = "*.*"
+    }
+    $script:ChangeTypes = [System.IO.WatcherChangeTypes]::Created,[System.IO.WatcherChangeTypes]::Changed,[System.IO.WatcherChangeTypes]::Deleted,[System.IO.WatcherChangeTypes]::Renamed
+    $script:Timeout = New-TimeSpan -Milliseconds 100
+}
+
+Function Wait-FileSystemChange {
+    $Result = $script:Watcher.WaitForChanged($script:ChangeTypes, $script:Timeout)
+    return $Result.TimedOut -eq $False -and $Result.Name -notlike "*.lock"
+}
+
+
 
 
 $LastChange = $null
@@ -64,21 +82,12 @@ if ([String]::IsNullOrWhiteSpace($Path)) {
 }
 $Path = $Path | Resolve-Path
 if ($GitCommand -eq "Graph") {
-    $GitFolder = ".git"
-    $WatchPath = [System.IO.Path]::Combine($Path, $GitFolder)
+    $WatchPath = [System.IO.Path]::Combine($Path, ".git")
 }
 else {
     $WatchPath = $Path
 }
-
-$Watcher = New-Object System.IO.FileSystemWatcher $WatchPath -Property @{
-    IncludeSubdirectories = $True
-    EnableRaisingEvents = $True
-    Filter = "*.*"
-}
-$ChangeTypes = [System.IO.WatcherChangeTypes]::Created,[System.IO.WatcherChangeTypes]::Changed,[System.IO.WatcherChangeTypes]::Deleted,[System.IO.WatcherChangeTypes]::Renamed
-$Timeout = New-TimeSpan -Milliseconds 100
-
+Initialize-FileSystemWatcher $WatchPath
 
 Write-Git $Path $LiveMessage $GitCommand
 
@@ -86,8 +95,7 @@ $Continue = $True
 while ($Continue) {
     $Host.UI.RawUI.FlushInputBuffer()
 
-    $Result = $Watcher.WaitForChanged($ChangeTypes, $Timeout)
-    if ($Result.TimedOut -eq $False -and $Result.Name -notlike "*.lock") {
+    if (Wait-FileSystemChange) {
         $LastChange = Get-Date
     }
 
