@@ -24,7 +24,7 @@ Function Write-ClippedCommandOutput {
     Write-Host $Output
 }
 
-Function Write-GitLog {
+Function Write-GitGraph {
     param([string] $Path, [switch] $Page)
 
     Clear-Host
@@ -59,7 +59,7 @@ $Job = Register-FileSystemWatcher $WatchPath -Action {
 
 
 try {
-    Write-GitLog $Path
+    Write-GitGraph $Path
 
     $Continue = $True
     while ($Continue) {
@@ -72,12 +72,12 @@ try {
                 $Continue = $False
             }
             else {
-                Write-GitLog $Path -Page
-                Write-GitLog $Path
+                Write-GitGraph $Path -Page
+                Write-GitGraph $Path
             }
         }
         if ($global:IsUpdateAvailable) {
-            Write-GitLog $Path
+            Write-GitGraph $Path
             $global:IsUpdateAvailable = $False
         }
     }
