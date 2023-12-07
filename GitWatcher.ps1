@@ -1,7 +1,8 @@
 param(
     [string] $Path,
     [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
-    [double] $UpdateDelaySeconds = 0.5
+    [double] $UpdateDelaySeconds = 0.5,
+    [string] $LiveMessage = "`e[32m(● Live)`e[0m"
 )
 
 Function Register-FileSystemWatcher {
@@ -56,12 +57,15 @@ Function Write-GitStatus {
 }
 
 Function Write-Git {
-    param([string] $Path, [switch] $Paginate, $GitCommand)
+    param([string] $Path, [string] $LiveMessage, [string] $GitCommand, [switch] $Paginate)
     if ($GitCommand -eq "Graph") {
         Write-GitGraph -Path $Path -Paginate:$Paginate
     }
     elseif ($GitCommand -eq "Status") {
         Write-GitStatus -Path $Path -Paginate:$Paginate
+    }
+    if (!$Paginate) {
+        Write-Host $LiveMessage -NoNewline
     }
 }
 
@@ -91,7 +95,7 @@ $Job = Register-FileSystemWatcher $WatchPath -Action {
 
 
 try {
-    Write-Git $Path $GitCommand
+    Write-Git $Path $LiveMessage $GitCommand
 
     $Continue = $True
     while ($Continue) {
@@ -104,12 +108,12 @@ try {
                 $Continue = $False
             }
             else {
-                Write-Git $Path -Paginate $GitCommand
-                Write-Git $Path $GitCommand
+                Write-Git $Path $LiveMessage $GitCommand -Paginate
+                Write-Git $Path $LiveMessage $GitCommand
             }
         }
         if ($null -ne $global:LastChange -and (New-TimeSpan -Start $global:LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
-            Write-Git $Path $GitCommand
+            Write-Git $Path $LiveMessage $GitCommand
             $global:LastChange = $null
         }
     }
