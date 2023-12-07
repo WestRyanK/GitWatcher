@@ -1,10 +1,3 @@
-param(
-    [string] $Path,
-    [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
-    [double] $UpdateDelaySeconds = 0.5,
-    [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m"
-)
-
 Function Write-ClippedCommandOutput {
     param([ScriptBlock] $Command)
 
@@ -74,46 +67,53 @@ Function Wait-FileSystemChange {
 }
 
 
+Function Watch-Git {
+    param(
+        [string] $Path,
+        [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
+        [double] $UpdateDelaySeconds = 0.5,
+        [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m"
+    )
 
+    $LastChange = $null
 
-$LastChange = $null
-
-if ([String]::IsNullOrWhiteSpace($Path)) {
-    $Path = "."
-}
-$Path = $Path | Resolve-Path
-$RepoName = $Path | Split-Path -Leaf
-if ($GitCommand -eq "Graph") {
-    $WatchPath = [System.IO.Path]::Combine($Path, ".git")
-}
-else {
-    $WatchPath = $Path
-}
-Initialize-FileSystemWatcher $WatchPath
-
-Write-Git $Path $LiveMessage $RepoName $GitCommand
-
-$Continue = $True
-while ($Continue) {
-    $Host.UI.RawUI.FlushInputBuffer()
-
-    if (Wait-FileSystemChange) {
-        $LastChange = Get-Date
+    if ([String]::IsNullOrWhiteSpace($Path)) {
+        $Path = "."
     }
+    $Path = $Path | Resolve-Path
+    $RepoName = $Path | Split-Path -Leaf
+    if ($GitCommand -eq "Graph") {
+        $WatchPath = [System.IO.Path]::Combine($Path, ".git")
+    }
+    else {
+        $WatchPath = $Path
+    }
+    Initialize-FileSystemWatcher $WatchPath
 
-    $IsKeyDown = [System.Console]::KeyAvailable;
-    if ($IsKeyDown) {
-        $PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-        if ($PressedKey.Character -eq "q") {
-            $Continue = $False
+	Write-Git $Path $LiveMessage $RepoName $GitCommand
+
+    $Continue = $True
+    while ($Continue) {
+        $Host.UI.RawUI.FlushInputBuffer()
+
+        if (Wait-FileSystemChange) {
+            $LastChange = Get-Date
         }
-        else {
-            Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate
-            Write-Git $Path $LiveMessage $RepoName $GitCommand
-        }
-    }
-    if ($null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
-        Write-Git $Path $LiveMessage $RepoName $GitCommand
-        $LastChange = $null
-    }
+
+		$IsKeyDown = [System.Console]::KeyAvailable;
+		if ($IsKeyDown) {
+			$PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+			if ($PressedKey.Character -eq "q") {
+				$Continue = $False
+			}
+			else {
+				Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate
+				Write-Git $Path $LiveMessage $RepoName $GitCommand
+			}
+		}
+		if ($null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds) {
+			Write-Git $Path $LiveMessage $RepoName $GitCommand
+			$LastChange = $null
+		}
+	}
 }
