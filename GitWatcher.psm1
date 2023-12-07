@@ -114,6 +114,12 @@ Function Watch-Git {
 				Write-Git $Path $LiveMessage $RepoName $GitCommand
 			}
 		}
+
+        $WindowSize = $Host.UI.RawUI.WindowSize
+        if ($LastWindowSize -ne $WindowSize) {
+            $LastChange = Get-Date
+        }
+        $LastWindowSize = $WindowSize
 	}
 }
 
