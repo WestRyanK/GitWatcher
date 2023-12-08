@@ -5,12 +5,12 @@ Function Write-ClippedCommandOutput {
     $MaxLines = $Size.Height - 1
     $Lines = Invoke-Command $Command -ArgumentList $MaxLines
     $ClippedLines = $Lines[0..($MaxLines - 1)]
-    $ClippedLines = $ClippedLines | Foreach-Object {
-        $NoAnsiEscapes = $_ -replace '\x1b\[[0-9;]*m', ''
-        $EscapeLength = $_.Length - $NoAnsiEscapes.Length
-        $SubstringLength = [Math]::Min($Size.Width, $NoAnsiEscapes.Length) + $EscapeLength - 1
-        $_.Substring(0, $SubstringLength)
-    }
+    # $ClippedLines = $ClippedLines | Foreach-Object {
+    #     $NoAnsiEscapes = $_ -replace '\x1b\[[0-9;]*m', ''
+    #     $EscapeLength = $_.Length - $NoAnsiEscapes.Length
+    #     $SubstringLength = [Math]::Min($Size.Width, $NoAnsiEscapes.Length) + $EscapeLength - 1
+    #     $_.Substring(0, $SubstringLength)
+    # }
     $Output = $ClippedLines | Join-String -Separator "`n"
     Clear-Host
     Write-Host $Output
