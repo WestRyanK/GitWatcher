@@ -7,6 +7,15 @@ and `git log --graph` to the see the state of your repository!
 
 ![Demo](Images/Demo.gif)
 
+## Prerequisites
+
+* **Windows Terminal**: Whether you use Git Watcher or not, Windows Terminal
+  is the best option for PowerShell. It is especially useful for Git Watcher
+  because it allows you to open side-by-side panes where you can execute commands
+  in one pane and view the git graph in the other.
+* **Git**: Git Watcher is used to watch a git repository. If you don't have git
+  installed, this tool obviously won't work.
+
 ## Install Instructions
 
 Run the following:
@@ -17,25 +26,41 @@ cd GitWatcher
 ./Install.ps1
 ```
 
+## Start-GitWatcher
 
-## How to Use
+`Start-GitWatcher` is an automatic approach to using Git Watcher. It opens
+two panels in the same window and runs `Graph` and `Status` modes for the current
+git repository.
 
-### Prerequisites
+```PowerShell
+Start-GitWatcher
+    [[-Path] <string>]
+    [-QuakeMode]
+```
 
-* **Windows Terminal**: Whether you use Git Watcher or not, Windows Terminal
-  is the best option for PowerShell. It is especially useful for Git Watcher
-  because it allows you to open side-by-side panes where you can execute commands
-  in one pane and view the git graph in the other.
+#### -Path
 
-### Usage
+Specifies the path to the git repository to watch. Defaults to the current
+directory if none is specified.
+
+#### -QuakeMode
+
+If you are using Windows Terminal, you must specify this switch. Otherwise,
+the Git Watcher panes will open in a new window.
+
+> **Note:** You can use `Start-QuakeGitWatcher` to easily make aliases.
+
+## Watch-Git
+
+`Watch-Git` is a lower-level approach, but you can use it to script a custom
+approach similar to `Start-GitWatcher`. If you want to use `Watch-Git` manually,
+use these instructions:
 
 1. Navigate to your git directory in Terminal.
 2. Open a second pane in Terminal and navigate to the same directory.
 3. Run `Watch-Git` in the second pane.
 4. In the first pane, enter git commands like normal.
 5. Watch as Git Watcher automatically updates as you work in the first pane.
-
-### Syntax
 
 ```PowerShell
 Watch-Git

@@ -136,4 +136,30 @@ Function Watch-Git {
 	}
 }
 
+Function Start-GitWatcher {
+    param([string] $Path, [switch] $QuakeMode)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        $Path = Get-Location
+    }
+
+    if (!(Test-GitPath $Path)) {
+        Write-Error "not a git repository: $Path"
+        return
+    }
+
+    $Window = if ($QuakeMode) { "_quake" } else { "0" }
+    $ArgString = "-w $Window split-pane --{0} pwsh -Command & {{ Set-Location '$Path' \; Watch-Git {1} }}"
+    $GraphPaneArgs = $ArgString -f "vertical", ""
+    $StatusPaneArgs = $ArgString -f "horizontal", "-GitCommand Status"
+    $PaneArgs = "$GraphPaneArgs; $StatusPaneArgs"
+    Start-Process wt -ArgumentList $PaneArgs
+}
+
+Function Start-QuakeGitWatcher {
+    Start-GitWatcher -Quake $Args
+}
+
 Export-ModuleMember -Function Watch-Git
+Export-ModuleMember -Function Start-GitWatcher
+Export-ModuleMember -Function Start-QuakeGitWatcher

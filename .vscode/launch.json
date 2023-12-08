@@ -15,15 +15,22 @@
             "name": "GitWatcher: Graph",
             "type": "PowerShell",
             "request": "launch",
-            "script": "./GitWatcher.Test.ps1",
+            "script": "./WatchGit.ps1",
             "args": ["${env:PATHARG}", "-GitCommand", "Graph"]
         },
         {
             "name": "GitWatcher: Status",
             "type": "PowerShell",
             "request": "launch",
-            "script": "./GitWatcher.Test.ps1",
+            "script": "./WatchGit.ps1",
             "args": ["${env:PATHARG}", "-GitCommand", "Status"]
+        },
+        {
+            "name": "GitWatcher: Start",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "./StartGitWatcher.ps1",
+            "args": ["${env:PATHARG}"]
         },
         {
             "name": "Install",
