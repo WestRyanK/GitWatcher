@@ -163,9 +163,9 @@ Function Watch-Git {
     while ($Continue) {
         $IsUpdateAvailable = $null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds
         if ($IsUpdateAvailable) {
-			Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
-			$LastChange = $null
-		}
+            Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
+            $LastChange = $null
+        }
 
         $Host.UI.RawUI.FlushInputBuffer()
 
@@ -173,24 +173,24 @@ Function Watch-Git {
             $LastChange = Get-Date
         }
 
-		$IsKeyDown = [System.Console]::KeyAvailable;
-		if ($IsKeyDown) {
-			$PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-			if ($PressedKey.Character -eq "q") {
-				$Continue = $False
-			}
-			else {
-				Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate -LineMode $LineMode
-				Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
-			}
-		}
+        $IsKeyDown = [System.Console]::KeyAvailable;
+        if ($IsKeyDown) {
+            $PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            if ($PressedKey.Character -eq "q") {
+                $Continue = $False
+            }
+            else {
+                Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate -LineMode $LineMode
+                Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
+            }
+        }
 
         $WindowSize = $Host.UI.RawUI.WindowSize
         if ($LastWindowSize -ne $WindowSize) {
             $LastChange = Get-Date
         }
         $LastWindowSize = $WindowSize
-	}
+    }
 }
 
 Function Start-GitWatcher {
