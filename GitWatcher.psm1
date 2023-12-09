@@ -1,13 +1,11 @@
-Function Resize-AnsiEscapedString {
+Function Format-AnsiEscapedString {
     param([string] $AnsiString, [int] $MaxLength)
 
     $IsInEscape = $False
-    $HasEscapes = $False
     for (($i = 0), ($Count = 0); ($i -lt $AnsiString.Length) -and ($Count -lt $MaxLength); $i++) {
         $Char = $AnsiString[$i]
         if ($Char -eq "`e") {
             $IsInEscape = $True
-            $HasEscapes = $True
         }
         if (!($IsInEscape)) {
             $Count++
@@ -18,58 +16,96 @@ Function Resize-AnsiEscapedString {
     }
 
     $ResizedString = $AnsiString.Substring(0, $i)
-    if ($HasEscapes) {
-        $ResizedString += "`e[0m"
-    }
     return $ResizedString
 }
 
+Function Format-WrappedAnsiEscapedLines {
+    param([Object[]] $Lines, [int] $WrapWidth, [int] $MaxLines)
+
+    $OutputLines = @()
+    for (($i = 0), ($Count = 0); ($i -lt $Lines.Length -and $Count -lt $MaxLines); ($i++)) {
+
+        $Line = $Lines[$i]
+        while ($Line.Length -gt 0 -and $Count -lt $MaxLines) {
+            $WrappedLine = Format-AnsiEscapedString $Line $WrapWidth
+            $OutputLines += $WrappedLine
+            $Count++
+            $Line = $Line.Substring($WrappedLine.Length, $Line.Length - $WrappedLine.Length)
+        }
+    }
+    return $OutputLines
+}
+
 Function Write-ClippedCommandOutput {
-    param([ScriptBlock] $Command)
+    param(
+        [ScriptBlock] $Command,
+        [ValidateSet("Wrap", "Clip")] [string] $LineMode
+    )
 
     $Size = $Host.UI.RawUI.WindowSize
     $MaxLines = $Size.Height - 1
     $Lines = Invoke-Command $Command -ArgumentList $MaxLines
-    $ClippedLines = $Lines[0..($MaxLines - 1)]
-    $ClippedLines = $ClippedLines | Foreach-Object { Resize-AnsiEscapedString $_ $Size.Width }
-    $Output = $ClippedLines | Join-String -Separator "`n"
+    if ($LineMode -eq "Wrap") {
+        $FormattedLines = Format-WrappedAnsiEscapedLines $Lines $Size.Width $MaxLines
+    }
+    elseif ($LineMode -eq "Clip") {
+        $FormattedLines = $Lines | Foreach-Object { Format-AnsiEscapedString $_ $Size.Width }
+        $FormattedLines = $FormattedLines[0..($MaxLines - 1)]
+    }
+    $Output = $FormattedLines | Join-String -Separator "`n"
     Clear-Host
     Write-Host $Output
 }
 
 Function Write-GitGraph {
-    param([string] $Path, [switch] $Paginate)
+    param(
+        [string] $Path,
+        [switch] $Paginate,
+        [ValidateSet("Wrap", "Clip")] [string] $LineMode
+    )
 
     if ($Paginate) {
         git -C "$Path" log --graph --oneline --branches
     }
     else {
-        Write-ClippedCommandOutput {
+        Write-ClippedCommandOutput -LineMode $LineMode {
             git -C "$Path" --no-pager log --graph --oneline --branches --decorate --color=always -$MaxLines
         }
     }
 }
 
 Function Write-GitStatus {
-    param([string] $Path, [switch] $Paginate)
+    param(
+        [string] $Path,
+        [switch] $Paginate,
+        [ValidateSet("Wrap", "Clip")] [string] $LineMode
+    )
 
     if ($Paginate) {
         git -c color.status=always -C "$Path" -p status
     }
     else {
-        Write-ClippedCommandOutput {
+        Write-ClippedCommandOutput -LineMode $LineMode {
             git -c color.status=always -C "$Path" status
         }
     }
 }
 
 Function Write-Git {
-    param([string] $Path, [string] $LiveMessage, [string] $RepoName, [string] $GitCommand, [switch] $Paginate)
+    param(
+        [string] $Path,
+        [string] $LiveMessage,
+        [string] $RepoName,
+        [string] $GitCommand,
+        [switch] $Paginate,
+        [ValidateSet("Wrap", "Clip")] [string] $LineMode
+    )
+
     if ($GitCommand -eq "Graph") {
-        Write-GitGraph -Path $Path -Paginate:$Paginate
+        Write-GitGraph -Path $Path -Paginate:$Paginate -LineMode $LineMode
     }
     elseif ($GitCommand -eq "Status") {
-        Write-GitStatus -Path $Path -Paginate:$Paginate
+        Write-GitStatus -Path $Path -Paginate:$Paginate -LineMode $LineMode
     }
     if (!$Paginate) {
         $FormattedMessage = $LiveMessage -f $RepoName
@@ -100,13 +136,13 @@ Function Test-GitPath {
     return $Result -eq "true"
 }
 
-
 Function Watch-Git {
     param(
         [string] $Path,
         [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
         [double] $UpdateDelaySeconds = 0.5,
-        [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m"
+        [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m",
+        [ValidateSet("Wrap", "Clip")] [string] $LineMode = "Wrap"
     )
 
     if ([String]::IsNullOrWhiteSpace($Path)) {
@@ -127,7 +163,7 @@ Function Watch-Git {
     while ($Continue) {
         $IsUpdateAvailable = $null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds
         if ($IsUpdateAvailable) {
-			Write-Git $Path $LiveMessage $RepoName $GitCommand
+			Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
 			$LastChange = $null
 		}
 
@@ -144,8 +180,8 @@ Function Watch-Git {
 				$Continue = $False
 			}
 			else {
-				Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate
-				Write-Git $Path $LiveMessage $RepoName $GitCommand
+				Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate -LineMode $LineMode
+				Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
 			}
 		}
 

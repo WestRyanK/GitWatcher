@@ -95,3 +95,9 @@ with the current repository directory.
 [ANSI escape codes](https://en.wikipedia.org/wiki/ANSI_escape_code#SGR)
 can be used to change colors and use other terminal effects. By default,
 the Live Message is green text that says `(● Live in '{0}')`.
+
+#### -LineMode
+
+Specifies how long lines should be handled. The value of `Wrap` causes long
+lines to be wrapped around to the next line. The value of `Clip` causes long
+lines to be clipped so that they never wrap to the next line.
