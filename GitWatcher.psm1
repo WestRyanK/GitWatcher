@@ -229,7 +229,8 @@ Function Start-GitWatcher {
     $ArgString = "-w $Window split-pane --{0} pwsh -Command & {{ Set-Location '$Path' \; Watch-Git {1} }}"
     $GraphPaneArgs = $ArgString -f "vertical", ""
     $StatusPaneArgs = $ArgString -f "horizontal", "-GitCommand Status"
-    $PaneArgs = "$GraphPaneArgs; $StatusPaneArgs"
+    $BranchPaneArgs = $ArgString -f "vertical", "-GitCommand Branch"
+    $PaneArgs = "$GraphPaneArgs; $StatusPaneArgs; $BranchPaneArgs"
     Start-Process wt -ArgumentList $PaneArgs
 }
 
