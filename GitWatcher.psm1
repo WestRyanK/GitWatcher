@@ -74,6 +74,23 @@ Function Write-GitGraph {
     }
 }
 
+Function Write-GitBranch {
+    param(
+        [string] $Path,
+        [switch] $Paginate,
+        [ValidateSet("Wrap", "Clip")] [string] $LineMode
+    )
+
+    if ($Paginate) {
+        git -c color.branch=always -C "$Path" branch
+    }
+    else {
+        Write-ClippedCommandOutput -LineMode $LineMode {
+            git -c color.branch=always -C "$Path" --no-pager branch
+        }
+    }
+}
+
 Function Write-GitStatus {
     param(
         [string] $Path,
@@ -107,6 +124,9 @@ Function Write-Git {
     elseif ($GitCommand -eq "Status") {
         Write-GitStatus -Path $Path -Paginate:$Paginate -LineMode $LineMode
     }
+    elseif ($GitCommand -eq "Branch") {
+        Write-GitBranch -Path $Path -Paginate:$Paginate -LineMode $LineMode
+    }
     if (!$Paginate) {
         $FormattedMessage = $LiveMessage -f $RepoName
         Write-Host $FormattedMessage -NoNewline
@@ -139,7 +159,7 @@ Function Test-GitPath {
 Function Watch-Git {
     param(
         [string] $Path,
-        [ValidateSet("Graph", "Status")] [String] $GitCommand = "Graph",
+        [ValidateSet("Graph", "Status", "Branch")] [String] $GitCommand = "Graph",
         [double] $UpdateDelaySeconds = 0.5,
         [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m",
         [ValidateSet("Wrap", "Clip")] [string] $LineMode = "Wrap"
@@ -155,7 +175,7 @@ Function Watch-Git {
         return
     }
 
-    $WatchPath = if ($GitCommand -eq "Graph") { [System.IO.Path]::Combine($Path, ".git") } else { $Path }
+    $WatchPath = if ($GitCommand -ne "Status") { [System.IO.Path]::Combine($Path, ".git") } else { $Path }
     Initialize-FileSystemWatcher $WatchPath
 
     $LastChange = [DateTime]::MinValue

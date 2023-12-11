@@ -5,13 +5,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "PowerShell: Launch Current File",
-            "type": "PowerShell",
-            "request": "launch",
-            "script": "${file}",
-            "args": ["${env:PATHARG}"]
-        },
-        {
             "name": "GitWatcher: Graph",
             "type": "PowerShell",
             "request": "launch",
@@ -26,6 +19,13 @@
             "args": ["${env:PATHARG}", "-GitCommand", "Status"]
         },
         {
+            "name": "GitWatcher: Branch",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "./WatchGit.ps1",
+            "args": ["${env:PATHARG}", "-GitCommand", "Branch"]
+        },
+        {
             "name": "GitWatcher: Start",
             "type": "PowerShell",
             "request": "launch",
@@ -37,6 +37,13 @@
             "type": "PowerShell",
             "request": "launch",
             "script": "./Install.ps1"
+        },
+        {
+            "name": "PowerShell: Launch Current File",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${file}",
+            "args": ["${env:PATHARG}"]
         }
     ]
 }

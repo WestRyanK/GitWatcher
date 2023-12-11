@@ -65,7 +65,7 @@ use these instructions:
 ```PowerShell
 Watch-Git
     [[-Path] <string>]
-    [[-GitCommand] {Graph | Status}]
+    [[-GitCommand] {Graph | Status | Branch}]
     [[-UpdateDelaySeconds] <double>]
     [[-LiveMessage] <string>]
 ```
@@ -77,9 +77,10 @@ directory if none is specified.
 
 #### -GitCommand
 
-Specifies which git command to continuously watch. `Graph` will show the
-`git log --graph --oneline --branches`. `Status` will show `git status`.
-Defaults to `Graph`.
+Specifies which git command to continuously watch. Defaults to `Graph`.
+* `Graph` will show the `git log --graph --oneline --branches`.
+* `Status` will show `git status`.
+* `Branch` will show `git branch`.
 
 #### -UpdateDelaySeconds
 
