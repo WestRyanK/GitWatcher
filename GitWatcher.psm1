@@ -20,7 +20,7 @@ Function Format-AnsiEscapedString {
 }
 
 Function Format-WrappedAnsiEscapedLines {
-    param([Object[]] $Lines, [int] $WrapWidth, [int] $MaxLines)
+    param([string[]] $Lines, [int] $WrapWidth, [int] $MaxLines)
 
     $OutputLines = @()
     for (($i = 0), ($Count = 0); ($i -lt $Lines.Length -and $Count -lt $MaxLines); ($i++)) {
@@ -213,8 +213,23 @@ Function Watch-Git {
     }
 }
 
+Function Split-LayoutCommands {
+    param([string] $Commands)
+
+    $SeparatorIndex = $Commands.IndexOf(":")
+    if ($SeparatorIndex -eq -1) {
+        return $null
+    }
+    $WindowCommand = $Commands.Substring(0, $SeparatorIndex)
+    $PaneCommand = $Commands.Substring($SeparatorIndex + 1, $Commands.Length - ($SeparatorIndex + 1)).Trim()
+    if ([string]::IsNullOrWhiteSpace($PaneCommand)) {
+        return $null
+    }
+    return ($WindowCommand, $PaneCommand)
+}
+
 Function Start-GitWatcher {
-    param([string] $Path, [switch] $QuakeMode)
+    param([string] $Path, [switch] $QuakeMode, [string[]] $LayoutCommands)
 
     if ([string]::IsNullOrWhiteSpace($Path)) {
         $Path = Get-Location
@@ -225,19 +240,29 @@ Function Start-GitWatcher {
         return
     }
 
-    $Window = if ($QuakeMode) { "_quake" } else { "0" }
-    $ArgString = "-w $Window split-pane --{0} pwsh -Command & {{ Set-Location '$Path' \; Watch-Git {1} }}"
-    $GraphPaneArgs = $ArgString -f "vertical", ""
-    $StatusPaneArgs = $ArgString -f "horizontal", "-GitCommand Status"
-    $BranchPaneArgs = $ArgString -f "vertical", "-GitCommand Branch"
-    $PaneArgs = "$GraphPaneArgs; $StatusPaneArgs; $BranchPaneArgs"
-    Start-Process wt -ArgumentList $PaneArgs
-}
+    if ($null -eq $LayoutCommands) {
+        $LayoutCommands = "split-pane --vertical:       Watch-Git -GitCommand Graph",
+                    "split-pane --horizontal --size .4: Watch-Git -GitCommand Status",
+                    "split-pane --vertical --size .3:   Watch-Git -GitCommand Branch",
+                    "move-focus first"
+    }
 
-Function Start-QuakeGitWatcher {
-    Start-GitWatcher -Quake $Args
+    $Window = if ($QuakeMode) { "_quake" } else { "0" }
+    $WindowCommandString = "-w $Window {0}"
+    $WindowPaneCommandString = $WindowCommandString -f "{0} pwsh -Command & {{ Set-Location '$Path' \; {1} }}"
+
+    $CommandArgs = $LayoutCommands | Foreach-Object {
+        $WindowPaneCommand = Split-LayoutCommands $_
+        if ($null -ne $WindowPaneCommand) {
+            $WindowPaneCommandString -f $WindowPaneCommand[0], $WindowPaneCommand[1]
+        }
+        else {
+            $WindowCommandString -f $_
+        }
+    } | Join-String -Separator "; "
+
+    Start-Process wt -ArgumentList $CommandArgs
 }
 
 Export-ModuleMember -Function Watch-Git
 Export-ModuleMember -Function Start-GitWatcher
-Export-ModuleMember -Function Start-QuakeGitWatcher

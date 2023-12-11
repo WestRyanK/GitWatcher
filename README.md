@@ -28,14 +28,17 @@ cd GitWatcher
 
 ## Start-GitWatcher
 
-`Start-GitWatcher` is an automatic approach to using Git Watcher. It opens
-two panels in the same window and runs `Graph` and `Status` modes for the current
-git repository.
+The `Start-GitWatcher` command allows you to automate opening a series of Windows
+Terminal panes that are watching different git commands. If no `LayoutCommands` are
+specified, it will use the following layout:
+
+![Default Panes](Images/DefaultPanes.png)
 
 ```PowerShell
 Start-GitWatcher
     [[-Path] <string>]
     [-QuakeMode]
+    [[-LayoutCommands] <string[]>]
 ```
 
 #### -Path
@@ -45,22 +48,40 @@ directory if none is specified.
 
 #### -QuakeMode
 
-If you are using Windows Terminal, you must specify this switch. Otherwise,
-the Git Watcher panes will open in a new window.
+If you are using Windows Terminal in quake mode, you must specify this switch.
+Otherwise, the Git Watcher panes will open in a new window.
 
-> **Note:** You can use `Start-QuakeGitWatcher` to easily make aliases.
+#### -LayoutCommands
+
+Specifies an array of commands that are sequentially issued to Windows
+Terminal in order to create the Git Watcher panes. Each command item in the
+array is of form `WindowCommand:PaneCommand`. For some items, you may want to
+execute only a `WindowCommand`. In those cases, `PaneCommand` will be empty.
+
+`Start-GitWatcher` will run the `LayoutCommands` sequentially in the following manner:
+1. The `WindowCommand` will execute in the current Windows Terminal window. Normally,
+  you will use a `split-pane` or `move-focus` command [from here](https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments?tabs=windows#split-pane-command).
+2. The `PaneCommand` will then execute in the focused Windows Terminal pane. Normally,
+  you will call `Watch-Git` with some parameters here.
+
+The following example demonstrates how the default pane layout is generated:
+```PowerShell
+Start-GitWatcher -LayoutCommands (
+  "split-pane --vertical:             Watch-Git -GitCommand Graph",
+  "split-pane --horizontal --size .4: Watch-Git -GitCommand Status",
+  "split-pane --vertical --size .3:   Watch-Git -GitCommand Branch",
+  "move-focus first" )
+```
+
+> **Note:** To easily reuse your Git Watcher layout, I recommend creating a function
+  in your PowerShell profile that calls `Start-GitWatcher` with your desired layout
+  commands.
 
 ## Watch-Git
 
-`Watch-Git` is a lower-level approach, but you can use it to script a custom
-approach similar to `Start-GitWatcher`. If you want to use `Watch-Git` manually,
-use these instructions:
-
-1. Navigate to your git directory in Terminal.
-2. Open a second pane in Terminal and navigate to the same directory.
-3. Run `Watch-Git` in the second pane.
-4. In the first pane, enter git commands like normal.
-5. Watch as Git Watcher automatically updates as you work in the first pane.
+The `Watch-Git` command should rarely be used by itself; instead, you should use
+the `Start-GitWatcher` command. If you want to adjust the layout of Git Watcher,
+you will need to use the `Watch-Git` command within the `LayoutCommands` parameters.
 
 ```PowerShell
 Watch-Git
