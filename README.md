@@ -68,7 +68,7 @@ The following example demonstrates how the default pane layout is generated:
 ```PowerShell
 Start-GitWatcher -LayoutCommands (
   "split-pane --vertical:             Watch-Git -GitCommand Graph",
-  "split-pane --horizontal --size .4: Watch-Git -GitCommand Status",
+  "split-pane --horizontal:           Watch-Git -GitCommand Status",
   "split-pane --vertical --size .3:   Watch-Git -GitCommand Branch",
   "move-focus first" )
 ```
