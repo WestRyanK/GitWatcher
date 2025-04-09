@@ -5,7 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:GitWatcher"
         mc:Ignorable="d"
+		Topmost="True"
+		WindowStyle="None"
+		AllowsTransparency="True"
+		Background="#1C1C1C"
         Title="MainWindow" Height="450" Width="800">
+	<Border BorderBrush="Green" BorderThickness="1">
 		<Grid>
+			<TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="Hello world!" Foreground="White" />
 		</Grid>
+	</Border>
 </Window>
