@@ -781,9 +781,15 @@ function formatSyncTags(branch) {
     return tags;
 }
 
-function createBranchItem(branch) {
+// Indents a branch tree row by its depth in the tree.
+function indentBranchRow(row, depth) {
+    row.style.paddingLeft = `${6 + depth * 14}px`;
+}
+
+function createBranchItem(branch, displayName = branch.name, depth = 0) {
     const item = createElement('button', 'branch-item');
     item.type = 'button';
+    indentBranchRow(item, depth);
     item.dataset.hash = branch.hash;
     item.dataset.name = branch.name;
     item.classList.toggle('current', Boolean(branch.current));
@@ -801,7 +807,7 @@ function createBranchItem(branch) {
         marker.title = 'Current branch (HEAD)';
         line.appendChild(marker);
     }
-    line.appendChild(createElement('span', 'branch-name', branch.name));
+    line.appendChild(createElement('span', 'branch-name', displayName));
     for (const tag of formatSyncTags(branch)) {
         const tagElement = createElement('span', `branch-tag ${tag.className}`, tag.text);
         tagElement.title = tag.title;
@@ -810,6 +816,97 @@ function createBranchItem(branch) {
     item.appendChild(line);
     item.appendChild(createElement('span', 'branch-subject', `${formatDate(branch.date)} · ${branch.subject}`));
     return item;
+}
+
+// Branch folders collapsed by the user, by path ("local:claude", "remote:origin/claude"). Folders are open by default.
+const branchFolderSettingKey = 'git-graph.collapsed-branch-folders';
+let collapsedBranchFolders = null;
+
+function getCollapsedBranchFolders() {
+    if (collapsedBranchFolders === null) {
+        try {
+            collapsedBranchFolders = new Set(JSON.parse(readSetting(branchFolderSettingKey) || '[]'));
+        } catch {
+            collapsedBranchFolders = new Set();
+        }
+    }
+    return collapsedBranchFolders;
+}
+
+// Saved settings are limited to 1,000 characters each, so keep only as many folders as fit.
+function saveCollapsedBranchFolders() {
+    const paths = [];
+    for (const path of getCollapsedBranchFolders()) {
+        if (JSON.stringify([...paths, path]).length > 1000) {
+            break;
+        }
+        paths.push(path);
+    }
+    writeSetting(branchFolderSettingKey, paths.length > 0 ? JSON.stringify(paths) : null);
+}
+
+// Groups branches into folders by the parts of their names: "claude/fix-x" goes in a "claude" folder.
+function buildBranchTree(branches) {
+    const root = { folders: new Map(), branches: [] };
+    for (const branch of branches) {
+        const parts = branch.name.split('/');
+        let node = root;
+        for (const part of parts.slice(0, -1)) {
+            if (!node.folders.has(part)) {
+                node.folders.set(part, { folders: new Map(), branches: [] });
+            }
+            node = node.folders.get(part);
+        }
+        node.branches.push({ branch, leafName: parts[parts.length - 1] });
+    }
+    return root;
+}
+
+function countTreeBranches(node) {
+    let count = node.branches.length;
+    for (const folder of node.folders.values()) {
+        count += countTreeBranches(folder);
+    }
+    return count;
+}
+
+function treeHasCurrentBranch(node) {
+    return node.branches.some((entry) => entry.branch.current)
+        || [...node.folders.values()].some(treeHasCurrentBranch);
+}
+
+// Folders come first, alphabetically, then the folder's branches in the order they were given. While filtering,
+// every folder is open, so all matches show.
+function appendBranchTree(fragment, node, depth, pathPrefix, filtering) {
+    const folderNames = [...node.folders.keys()].sort((a, b) => a.localeCompare(b));
+    for (const name of folderNames) {
+        const folder = node.folders.get(name);
+        const path = `${pathPrefix}${name}`;
+        const collapsed = !filtering && getCollapsedBranchFolders().has(path);
+
+        const row = createElement('button', 'branch-folder');
+        row.type = 'button';
+        row.dataset.path = path;
+        row.setAttribute('aria-expanded', String(!collapsed));
+        indentBranchRow(row, depth);
+        row.innerHTML = '<svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
+        row.appendChild(createElement('span', 'branch-folder-name', name));
+        if (collapsed && treeHasCurrentBranch(folder)) {
+            const marker = createElement('span', 'current-marker');
+            marker.title = 'Contains the current branch (HEAD)';
+            row.appendChild(marker);
+        }
+        row.appendChild(createElement('span', 'branch-folder-count', String(countTreeBranches(folder))));
+        fragment.appendChild(row);
+
+        if (!collapsed) {
+            appendBranchTree(fragment, folder, depth + 1, `${path}/`, filtering);
+        }
+    }
+
+    for (const entry of node.branches) {
+        fragment.appendChild(createBranchItem(entry.branch, entry.leafName, depth));
+    }
 }
 
 function renderBranches() {
@@ -829,14 +926,10 @@ function renderBranches() {
     if (showRemote) {
         fragment.appendChild(createElement('div', 'pane-group', `Local (${local.length})`));
     }
-    for (const branch of local) {
-        fragment.appendChild(createBranchItem(branch));
-    }
+    appendBranchTree(fragment, buildBranchTree(local), 0, 'local:', query !== '');
     if (showRemote) {
         fragment.appendChild(createElement('div', 'pane-group', `Remote (${remote.length})`));
-        for (const branch of remote) {
-            fragment.appendChild(createBranchItem(branch));
-        }
+        appendBranchTree(fragment, buildBranchTree(remote), 0, 'remote:', query !== '');
     }
     if (local.length === 0 && remote.length === 0) {
         fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches match.' : 'No branches.'));
@@ -849,7 +942,6 @@ function renderBranches() {
         ? `${data.local.length} local, ${data.remote.length} remote`
         : `${data.local.length}`;
 }
-
 async function loadBranches() {
     if (!isPaneOpen(elements.branchesPane)) {
         return;
@@ -863,6 +955,19 @@ async function loadBranches() {
 }
 
 elements.branches.addEventListener('click', (event) => {
+    const folder = event.target.closest('.branch-folder');
+    if (folder) {
+        const folders = getCollapsedBranchFolders();
+        if (folders.has(folder.dataset.path)) {
+            folders.delete(folder.dataset.path);
+        } else {
+            folders.add(folder.dataset.path);
+        }
+        saveCollapsedBranchFolders();
+        renderBranches();
+        return;
+    }
+
     const item = event.target.closest('.branch-item');
     if (!item) {
         return;

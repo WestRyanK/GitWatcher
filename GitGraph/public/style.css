@@ -505,6 +505,56 @@ body.resizing.resizing-rows {
     background: var(--bg-selected);
 }
 
+/* A folder of branches, from the parts of their names ("claude/..."). Its chevron opens and closes it. */
+.branch-folder {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    width: 100%;
+    padding: 3px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.branch-folder:hover,
+.branch-folder:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.branch-folder .chevron {
+    flex: none;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease;
+}
+
+.branch-folder[aria-expanded="false"] .chevron {
+    transform: rotate(-90deg);
+}
+
+.branch-folder-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    font-weight: 600;
+}
+
+.branch-folder-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+}
+
 .branch-line {
     display: flex;
     gap: 6px;

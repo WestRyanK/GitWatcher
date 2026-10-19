@@ -85,8 +85,8 @@ runtime, which comes with Windows 11. How it works:
 * `GET /api/version` returns a fingerprint of the refs and HEAD. The page polls it every 3 seconds and reloads the
   graph when it changes. This covers new commits, branch moves, and checkouts.
 * `GET /api/branches` returns local and remote branches from `git for-each-ref`, with each local branch's upstream,
-  ahead/behind counts, and the worktree it's checked out in. The **Branches** pane lists them. Click one to jump to
-  its tip commit.
+  ahead/behind counts, and the worktree it's checked out in. The **Branches** pane lists them in folders by name
+  (`claude/...` under **claude**), which open and close with a click. Click a branch to jump to its tip commit.
 * `GET /api/status` returns `git status --porcelain=v2 --branch` for the folder the server runs in: conflicts,
   staged, unstaged, and untracked files. The **Status** pane polls it with the graph. `GIT_OPTIONAL_LOCKS=0` stops
   `git status` from writing its refreshed index.
