@@ -77,7 +77,7 @@ runtime, which comes with Windows 11. How it works:
 
 * `server.js` uses only Node's built-in modules (no `npm install`). It listens on `127.0.0.1` and runs only
   read-only git commands (`log`, `rev-list`, `for-each-ref`, `rev-parse`, `symbolic-ref`, `show`, `diff-tree`,
-  `status`) with `GIT_OPTIONAL_LOCKS=0`. It never writes to the repository. The only request that writes anything
+  `status`, and `ls-remote --get-url`, which only reads the configured URL) with `GIT_OPTIONAL_LOCKS=0`. It never writes to the repository. The only request that writes anything
   is `PUT /api/settings` (see below); it rejects every other request that isn't `GET`.
 * `GET /api/graph?scope=S&limit=N` returns commits from `git log --topo-order`, plus refs and HEAD. The page's
   **Commits from** selector sets the scope: `current` (`HEAD` only), `local` (`--branches` and `HEAD`), or `all`
@@ -100,6 +100,10 @@ runtime, which comes with Windows 11. How it works:
   visible. An open pane's button is highlighted. Clicking **Status** opens only Status, and clicking **Branches** as
   well shows both, stacked. With both closed, only the rail is left. Clicking an open pane's title closes it too.
 * Drag any divider to resize the panes (arrow keys work too when a divider has focus, and double-click resets it).
+* Right-click a commit to copy its hash, short hash, subject, or full message, show its details, or open it in Azure
+  DevOps (or GitHub; the link comes from the `origin` remote). Right-click a branch or tag to copy its name, go to
+  its commit, or copy a `git checkout` command to run yourself. The menu never changes the repository. In the
+  Windows Terminal overlay, web links open in the default browser.
 * The **Author**, **Date**, and **Commit** labels in the Commits title row line up with those columns. Drag the edge
   before a label to resize the column to its left, like a table: the edge before **Author** resizes the subjects,
   and the columns after it move along. Dragging the author or date column down to nothing hides it (drag its edge

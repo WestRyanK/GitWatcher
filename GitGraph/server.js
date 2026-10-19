@@ -23,9 +23,10 @@ const maxSettingsBytes = 64 * 1024;
 const settingKeyPattern = /^git-graph\.[\w.-]{1,100}$/;
 
 // Only these git subcommands are ever run. All of them are read-only. `status` normally refreshes the index,
-// but GIT_OPTIONAL_LOCKS=0 (set in runGit) stops it from writing.
+// but GIT_OPTIONAL_LOCKS=0 (set in runGit) stops it from writing. `ls-remote` is only run with `--get-url`, which
+// prints the configured URL without contacting the remote.
 const allowedGitCommands = new Set([
-    'log', 'rev-list', 'for-each-ref', 'rev-parse', 'symbolic-ref', 'show', 'diff-tree', 'status',
+    'log', 'rev-list', 'for-each-ref', 'rev-parse', 'symbolic-ref', 'show', 'diff-tree', 'status', 'ls-remote',
 ]);
 
 // Which commits to include, as git revision arguments.
@@ -124,9 +125,51 @@ async function getVersion() {
     return { fingerprint };
 }
 
+// Re-encodes one part of a web address, whether or not it was already encoded (an SSH URL has raw spaces).
+function encodeUrlPart(part) {
+    try {
+        return encodeURIComponent(decodeURIComponent(part));
+    } catch {
+        return encodeURIComponent(part);
+    }
+}
+
+// Turns the origin remote's URL into the web address of its commits, for Azure DevOps and GitHub, so the page can
+// open a commit there. Returns null for other hosts, or when there's no origin.
+function getCommitWebLink(remoteUrl) {
+    if (!remoteUrl) {
+        return null;
+    }
+
+    const azureDevOps = (organization, project, repository) => ({
+        provider: 'Azure DevOps',
+        commitUrl: `https://dev.azure.com/${encodeUrlPart(organization)}/${encodeUrlPart(project)}/_git/${encodeUrlPart(repository)}/commit/`,
+    });
+    let match = /^https:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+?)\/?$/i.exec(remoteUrl);
+    if (match) {
+        return azureDevOps(match[1], match[2], match[3]);
+    }
+    match = /^https:\/\/(?:[^@/]+@)?([^./]+)\.visualstudio\.com\/(?:DefaultCollection\/)?([^/]+)\/_git\/([^/]+?)\/?$/i.exec(remoteUrl);
+    if (match) {
+        return azureDevOps(match[1], match[2], match[3]);
+    }
+    match = /^(?:ssh:\/\/)?[^@]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)[:/]v3\/([^/]+)\/([^/]+)\/([^/]+?)\/?$/i.exec(remoteUrl);
+    if (match) {
+        return azureDevOps(match[1], match[2], match[3]);
+    }
+    match = /^(?:https:\/\/(?:[^@/]+@)?github\.com\/|(?:ssh:\/\/)?git@github\.com[:/])([^/]+)\/([^/]+?)(?:\.git)?\/?$/i.exec(remoteUrl);
+    if (match) {
+        return {
+            provider: 'GitHub',
+            commitUrl: `https://github.com/${encodeUrlPart(match[1])}/${encodeUrlPart(match[2])}/commit/`,
+        };
+    }
+    return null;
+}
+
 async function getGraph(limit, scope) {
     const revisions = scopeRevisions[scope];
-    const [{ refs, raw }, head, logOutput, totalOutput, toplevel] = await Promise.all([
+    const [{ refs, raw }, head, logOutput, totalOutput, toplevel, remoteUrl] = await Promise.all([
         getRefs(),
         getHead(),
         runGit([
@@ -135,6 +178,7 @@ async function getGraph(limit, scope) {
         ]).catch(() => ''),
         runGitOrNull(['rev-list', ...revisions, '--count']).catch(() => null),
         runGitOrNull(['rev-parse', '--show-toplevel']),
+        runGitOrNull(['ls-remote', '--get-url', 'origin']),
     ]);
 
     const commits = [];
@@ -167,6 +211,7 @@ async function getGraph(limit, scope) {
         limit,
         scope,
         total: totalOutput ? Number(totalOutput) : null,
+        web: getCommitWebLink(remoteUrl),
         fingerprint,
     };
 }

@@ -789,6 +789,9 @@ function createBranchItem(branch, displayName = branch.name, depth = 0) {
     indentBranchRow(item, depth);
     item.dataset.hash = branch.hash;
     item.dataset.name = branch.name;
+    item.dataset.refName = branch.name;
+    // Only local branches have a current flag.
+    item.dataset.kind = 'current' in branch ? 'local' : 'remote';
     item.classList.toggle('current', Boolean(branch.current));
     item.classList.toggle('selected', branch.name === state.selectedBranch);
     item.title = [
@@ -922,6 +925,8 @@ function createTagItem(tag, displayName = tag.name, depth = 0) {
     indentBranchRow(item, depth);
     item.dataset.hash = tag.hash;
     item.dataset.name = `tag:${tag.name}`;
+    item.dataset.refName = tag.name;
+    item.dataset.kind = 'tag';
     item.classList.toggle('selected', item.dataset.name === state.selectedBranch);
     item.title = [
         tag.name,
@@ -1109,18 +1114,158 @@ elements.graph.addEventListener('click', (event) => {
     }
 });
 
-// Double-clicking a commit also opens the Commit details pane if it's collapsed.
-elements.graph.addEventListener('dblclick', (event) => {
-    const row = event.target.closest('.row');
-    if (!row) {
-        return;
-    }
+// Selects a commit and opens the Commit details pane if it's collapsed.
+function showCommitDetails(hash, scrollIntoView) {
     if (elements.detailsPane.classList.contains('collapsed')) {
         setPaneCollapsed('details-pane', false);
         writeSetting(`${settingKeys.collapsedPrefix}details-pane`, 'false');
     }
-    selectCommit(row.dataset.hash, false);
+    selectCommit(hash, scrollIntoView);
+}
+
+elements.graph.addEventListener('dblclick', (event) => {
+    const row = event.target.closest('.row');
+    if (row) {
+        showCommitDetails(row.dataset.hash, false);
+    }
 });
+
+// The right-click menu for commits, branches, and tags. Every action only reads: it copies text, selects a commit,
+// or opens a web page. Nothing changes the repository; a checkout command is copied for the user to run.
+const contextMenu = {
+    element: document.getElementById('context-menu'),
+    target: null,
+};
+
+function closeContextMenu() {
+    if (contextMenu.element.hidden) {
+        return;
+    }
+    contextMenu.element.hidden = true;
+    contextMenu.element.replaceChildren();
+    contextMenu.target?.classList.remove('context-target');
+    contextMenu.target = null;
+}
+
+// Items are { label, action } objects, or 'separator'.
+function openContextMenu(event, target, items) {
+    event.preventDefault();
+    closeContextMenu();
+    contextMenu.target = target;
+    target.classList.add('context-target');
+
+    for (const item of items) {
+        if (item === 'separator') {
+            const separator = createElement('div', 'context-menu-separator');
+            separator.setAttribute('role', 'separator');
+            contextMenu.element.appendChild(separator);
+            continue;
+        }
+        const button = createElement('button', 'context-menu-item', item.label);
+        button.type = 'button';
+        button.setAttribute('role', 'menuitem');
+        button.addEventListener('click', () => {
+            closeContextMenu();
+            item.action();
+        });
+        contextMenu.element.appendChild(button);
+    }
+
+    // Open at the pointer, kept inside the window.
+    contextMenu.element.hidden = false;
+    const menuRect = contextMenu.element.getBoundingClientRect();
+    const left = Math.max(4, Math.min(event.clientX, window.innerWidth - menuRect.width - 4));
+    const top = Math.max(4, Math.min(event.clientY, window.innerHeight - menuRect.height - 4));
+    contextMenu.element.style.left = `${left}px`;
+    contextMenu.element.style.top = `${top}px`;
+    contextMenu.element.querySelector('button')?.focus();
+}
+
+async function copyWithStatus(getText, description) {
+    try {
+        await copyText(await getText());
+        setStatus(`Copied ${description}`);
+    } catch (error) {
+        setStatus(`Couldn't copy ${description}: ${error.message}`);
+    }
+}
+
+async function getCommitDetails(hash) {
+    let details = state.detailsCache.get(hash);
+    if (!details) {
+        details = await fetchJson(`/api/commit/${hash}`);
+        state.detailsCache.set(hash, details);
+    }
+    return details;
+}
+
+// In a browser this opens a new tab. The Windows Terminal overlay opens it in the default browser.
+function openWebPage(url) {
+    window.open(url, '_blank', 'noopener');
+}
+
+elements.graph.addEventListener('contextmenu', (event) => {
+    const row = event.target.closest('.row');
+    if (!row) {
+        return;
+    }
+    const hash = row.dataset.hash;
+    const subject = row.querySelector('.subject').textContent;
+    const items = [
+        { label: 'Copy commit hash', action: () => copyWithStatus(() => hash, 'the commit hash') },
+        { label: 'Copy short hash', action: () => copyWithStatus(() => hash.slice(0, 8), 'the short hash') },
+        { label: 'Copy subject', action: () => copyWithStatus(() => subject, 'the subject') },
+        { label: 'Copy message', action: () => copyWithStatus(async () => (await getCommitDetails(hash)).message, 'the message') },
+        'separator',
+        { label: 'Show details', action: () => showCommitDetails(hash, false) },
+    ];
+    const web = state.data?.web;
+    if (web) {
+        items.push({ label: `Open in ${web.provider}`, action: () => openWebPage(`${web.commitUrl}${hash}`) });
+    }
+    openContextMenu(event, row, items);
+});
+
+elements.branches.addEventListener('contextmenu', (event) => {
+    const item = event.target.closest('.branch-item');
+    if (!item) {
+        return;
+    }
+    const name = item.dataset.refName;
+    const kind = item.dataset.kind;
+    const noun = kind === 'tag' ? 'tag' : 'branch';
+    // A remote branch is checked out as a new local branch that tracks it. A tag is checked out as a detached HEAD.
+    const checkout = kind === 'remote' ? `git checkout --track ${name}` : `git checkout ${name}`;
+    openContextMenu(event, item, [
+        { label: `Copy ${noun} name`, action: () => copyWithStatus(() => name, `the ${noun} name`) },
+        { label: 'Go to commit', action: () => selectCommit(item.dataset.hash, true) },
+        { label: 'Copy checkout command', action: () => copyWithStatus(() => checkout, `"${checkout}"`) },
+    ]);
+});
+
+document.addEventListener('pointerdown', (event) => {
+    if (!contextMenu.element.contains(event.target)) {
+        closeContextMenu();
+    }
+});
+
+contextMenu.element.addEventListener('keydown', (event) => {
+    const buttons = [...contextMenu.element.querySelectorAll('button')];
+    const index = buttons.indexOf(document.activeElement);
+    if (event.key === 'Escape') {
+        closeContextMenu();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        buttons[(index + step + buttons.length) % buttons.length].focus();
+    }
+});
+
+for (const scroller of [elements.graphScroll, elements.branches]) {
+    scroller.addEventListener('scroll', closeContextMenu);
+}
+window.addEventListener('blur', closeContextMenu);
+window.addEventListener('resize', closeContextMenu);
 elements.filter.addEventListener('input', applyFilter);
 elements.scope.addEventListener('change', loadGraph);
 elements.limit.addEventListener('change', loadGraph);

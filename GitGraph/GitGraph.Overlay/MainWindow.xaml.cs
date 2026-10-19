@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
@@ -204,6 +205,20 @@ public partial class MainWindow : Window
         if (!e.IsSuccess)
         {
             ShowMessage($"Couldn't start WebView2: {e.InitializationException.Message}");
+            return;
+        }
+
+        Viewer.CoreWebView2.NewWindowRequested += OnViewerNewWindowRequested;
+    }
+
+    // The page opens web pages, such as a commit in Azure DevOps, in a new window. Open them in the default browser
+    // instead of a bare WebView2 window. Only web addresses are opened.
+    private void OnViewerNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    {
+        e.Handled = true;
+        if (Uri.TryCreate(e.Uri, UriKind.Absolute, out Uri? uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+        {
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }
     }
 
