@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Git Graph</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="toolbar">
+        <div class="title">
+            <strong id="repo-name">Git Graph</strong>
+            <span id="head-info" class="muted"></span>
+        </div>
+        <div class="controls">
+            <input id="filter" type="search" placeholder="Filter subject, author, hash" aria-label="Filter commits">
+            <label>
+                Commits from
+                <select id="scope">
+                    <option value="current">Current branch</option>
+                    <option value="local">Local branches</option>
+                    <option value="all" selected>All (local and remote)</option>
+                </select>
+            </label>
+            <label>
+                Show
+                <select id="limit">
+                    <option value="200">200</option>
+                    <option value="500" selected>500</option>
+                    <option value="1000">1,000</option>
+                    <option value="3000">3,000</option>
+                    <option value="20000">All</option>
+                </select>
+            </label>
+            <label><input id="auto-refresh" type="checkbox" checked> Live</label>
+            <button id="refresh" type="button">Refresh</button>
+            <span id="status" class="muted" aria-live="polite"></span>
+        </div>
+    </header>
+    <main id="workspace" class="workspace">
+        <aside id="sidebar" class="sidebar stack">
+            <nav id="sidebar-rail" class="sidebar-rail" aria-label="Collapsed panes">
+                <button id="rail-branches" class="pane-toggle rail-button" type="button" aria-expanded="true"
+                    aria-controls="sidebar" title="Expand">
+                    <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
+                </button>
+                <button id="rail-working-tree" class="pane-toggle rail-button" type="button" aria-expanded="true"
+                    aria-controls="sidebar" title="Expand">
+                    <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
+                </button>
+            </nav>
+            <section id="branches-pane" class="pane sized-pane" aria-labelledby="branches-heading">
+                <header class="pane-header">
+                    <h2 id="branches-heading">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="sidebar">
+                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
+                        </button>
+                    </h2>
+                    <span id="branches-count" class="muted"></span>
+                    <label class="pane-option"><input id="show-remote-branches" type="checkbox"> Remote</label>
+                </header>
+                <input id="branch-filter" class="pane-filter" type="search" placeholder="Filter branches"
+                    aria-label="Filter branches">
+                <div id="branches" class="pane-body"></div>
+            </section>
+            <div id="sidebar-splitter" class="splitter" role="separator" tabindex="0" aria-controls="branches-pane"
+                aria-label="Resize the branches and status panes" title="Drag to resize. Double-click to reset."></div>
+            <section id="working-tree-pane" class="pane" aria-labelledby="working-tree-heading">
+                <header class="pane-header">
+                    <h2 id="working-tree-heading">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="sidebar">
+                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
+                        </button>
+                    </h2>
+                    <span id="working-tree-count" class="muted"></span>
+                </header>
+                <div id="working-tree" class="pane-body"></div>
+            </section>
+        </aside>
+        <div id="workspace-splitter" class="splitter" role="separator" tabindex="0" aria-controls="sidebar"
+            aria-label="Resize the sidebar" title="Drag to resize. Double-click to reset."></div>
+        <div id="layout" class="layout stack">
+            <section id="graph-pane" class="pane" aria-labelledby="graph-heading">
+                <header class="pane-header">
+                    <h2 id="graph-heading">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="graph-pane">
+                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Commits
+                        </button>
+                    </h2>
+                </header>
+                <div id="graph-scroll" class="graph-scroll">
+                    <div id="graph" class="graph"></div>
+                </div>
+            </section>
+            <div id="splitter" class="splitter" role="separator" tabindex="0" aria-controls="details-pane"
+                aria-label="Resize the commit details panel" title="Drag to resize. Double-click to reset."></div>
+            <section id="details-pane" class="pane sized-pane details-pane" aria-labelledby="details-heading">
+                <header class="pane-header">
+                    <h2 id="details-heading">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="details-pane">
+                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Commit details
+                        </button>
+                    </h2>
+                </header>
+                <div id="details" class="details">
+                    <p class="muted">Select a commit to see its details.</p>
+                </div>
+            </section>
+        </div>
+    </main>
+    <script src="app.js"></script>
+</body>
+</html>
