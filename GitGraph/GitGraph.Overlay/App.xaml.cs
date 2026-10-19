@@ -43,7 +43,7 @@ public partial class App : Application
         try
         {
             _server = await GitGraphServer.StartAsync(options.ServerScript, options.RepositoryPath);
-            await window.ShowViewerAsync(_server.Address);
+            window.ShowViewer(_server.Address);
         }
         catch (Exception exception)
         {

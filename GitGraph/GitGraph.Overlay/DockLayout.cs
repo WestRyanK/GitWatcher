@@ -23,4 +23,19 @@ internal static class DockLayout
         int top = Math.Min(terminal.Top + topInset, terminal.Bottom);
         return new PixelRect(terminal.Right - width, top, terminal.Right, terminal.Bottom);
     }
+
+    /// <summary>
+    /// Calculates where the minimized overlay's button goes: in the terminal's top-right corner, below its top inset.
+    /// </summary>
+    /// <param name="terminal">The terminal's visible client area, in physical pixels.</param>
+    /// <param name="size">The button's width and height, in pixels.</param>
+    /// <param name="topInset">Pixels to leave uncovered at the top of the terminal.</param>
+    /// <param name="rightMargin">The gap between the button and the terminal's right edge, in pixels.</param>
+    /// <param name="topMargin">The gap between the button and the top inset, in pixels.</param>
+    public static PixelRect CalculateButton(PixelRect terminal, int size, int topInset, int rightMargin, int topMargin)
+    {
+        int right = Math.Max(terminal.Right - rightMargin, terminal.Left + size);
+        int top = Math.Min(terminal.Top + topInset + topMargin, terminal.Bottom - size);
+        return new PixelRect(right - size, top, right, top + size);
+    }
 }

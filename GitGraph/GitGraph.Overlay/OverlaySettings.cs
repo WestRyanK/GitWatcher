@@ -18,6 +18,9 @@ internal sealed class OverlaySettings
     /// <summary>The overlay's width as a fraction of the terminal's width.</summary>
     public double WidthFraction { get; set; } = DefaultWidthFraction;
 
+    /// <summary>Whether the overlay is minimized to a small button.</summary>
+    public bool Collapsed { get; set; }
+
     public static OverlaySettings Load()
     {
         try

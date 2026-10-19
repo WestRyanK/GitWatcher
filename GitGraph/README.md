@@ -29,17 +29,21 @@ From PowerShell in Windows Terminal (or a classic console window), run:
 .\GitGraph\Show-GitGraph.ps1
 ```
 
-This opens the viewer in a panel docked to the right side of that terminal window, below its tabs. The panel
+This opens the viewer in a panel docked to the right side of that terminal window, below its tabs. When the tab
+row is hidden (quake mode, focus mode, or full screen), the panel reaches the top of the window. The panel
 follows the window when you move or resize it, hides when you minimize it, and closes when you close the window
-or exit the shell. Drag the panel's left edge to change its width (double-click the edge to reset it). The width
-is saved in `~/.git-graph/overlay.json`. To open the panel by typing `gg`, add an alias to your PowerShell profile:
+or exit the shell. Drag the panel's left edge to change its width (double-click the edge to reset it). The panel's
+minimize button shrinks it to a small button in the terminal's top-right corner. Click that button to open the panel
+again. The viewer keeps running while it's minimized, so it reopens instantly. The width and the minimized state are
+saved in `~/.git-graph/overlay.json`. To open the panel by typing `gg`, add an alias to your PowerShell profile:
 
 ```powershell
 Set-Alias gg D:\source\GitHub\GitWatcher\GitGraph\Show-GitGraph.ps1
 ```
 
 The panel is `GitGraph.Overlay`, a small WPF app. `Show-GitGraph.ps1` builds it on first use, and again whenever
-its sources change. It needs the .NET 10 SDK, Node.js, and the WebView2 runtime, which comes with Windows 11. How
+its sources change. An open panel locks the program, so after an update the script starts the current version and
+asks you to close every panel. The next run then rebuilds it. It needs the .NET 10 SDK, Node.js, and the WebView2 runtime, which comes with Windows 11. How
 it works:
 
 * It finds the terminal window through the console of the shell that started it: Windows Terminal owns that
@@ -47,6 +51,8 @@ it works:
 * The panel is an owned window of the terminal window, so it stays just above the terminal (not above every
   window) and hides with it. A `SetWinEventHook` location-change hook keeps it docked. Nothing is injected into
   Windows Terminal, and Windows Terminal's own window isn't changed.
+* It finds the top of the terminal panes through UI Automation (Windows Terminal's `TermControl` elements), instead
+  of assuming a tab row, and checks again every half second in case the tab row was shown or hidden.
 * It starts its own `server.js` on a free port for the shell's current folder, shows it with WebView2, and stops the
   server when it closes. The server also exits on its own if the panel's process goes away. The page settings are
   shared with the browser view.

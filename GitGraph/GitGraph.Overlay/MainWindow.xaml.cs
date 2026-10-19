@@ -1,8 +1,11 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
 
 namespace GitGraph.Overlay;
 
@@ -14,10 +17,22 @@ public partial class MainWindow : Window
     // Sizes in device-independent pixels; they're scaled by the terminal's DPI.
     private const double MinimumOverlayWidth = 280;
     private const double MinimumTerminalWidth = 160;
+    private const double CollapsedButtonSize = 32;
+
+    // Keeps the minimized button clear of Windows Terminal's scroll bar on the right edge.
+    private const double CollapsedButtonRightMargin = 24;
+    private const double CollapsedButtonTopMargin = 8;
+
+    // How often to check whether the terminal's tab row appeared or disappeared, for example when focus mode is
+    // turned on or off. Moving or resizing the window doesn't change it, so this doesn't need to be frequent.
+    private static readonly TimeSpan TopInsetRefreshInterval = TimeSpan.FromSeconds(0.5);
 
     private readonly TerminalWindow _terminal;
     private readonly OverlaySettings _settings;
     private TerminalWindowTracker? _tracker;
+    private readonly DispatcherTimer _topInsetTimer;
+    private int? _measuredTopInset;
+    private bool _measuringTopInset;
     private nint _handle;
     private NativeMethods.Point _dragStart;
     private int _dragStartWidth;
@@ -27,23 +42,27 @@ public partial class MainWindow : Window
         _terminal = terminal;
         _settings = settings;
         InitializeComponent();
+        _topInsetTimer = new DispatcherTimer { Interval = TopInsetRefreshInterval };
+        _topInsetTimer.Tick += OnTopInsetTimerTick;
         SourceInitialized += OnSourceInitialized;
         DpiChanged += OnDpiChanged;
         Closed += OnClosed;
     }
 
-    internal async Task ShowViewerAsync(Uri address)
+    internal void ShowViewer(Uri address)
     {
-        // WebView2 is a hosted native window, so it must be visible to initialize, and nothing can draw over it.
+        // WebView2 is a hosted native window, so nothing can draw over it. It initializes once it's on screen, which
+        // is later if the overlay starts minimized.
         MessageText.Visibility = Visibility.Collapsed;
         Viewer.Visibility = Visibility.Visible;
-
-        string userDataFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "GitGraph.Overlay",
-            "WebView2");
-        CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
-        await Viewer.EnsureCoreWebView2Async(environment);
+        Viewer.CreationProperties = new CoreWebView2CreationProperties
+        {
+            UserDataFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "GitGraph.Overlay",
+                "WebView2"),
+        };
+        Viewer.CoreWebView2InitializationCompleted += OnViewerInitializationCompleted;
         Viewer.Source = address;
     }
 
@@ -66,6 +85,54 @@ public partial class MainWindow : Window
         _tracker = new TerminalWindowTracker(_terminal.Handle);
         _tracker.Moved += (_, _) => Reposition();
         _tracker.Closed += (_, _) => Close();
+
+        // Measure once before the first layout, so the overlay doesn't start in the wrong place and jump.
+        _measuredTopInset = _terminal.MeasureTopInset();
+        _topInsetTimer.Start();
+        SetCollapsed(_settings.Collapsed);
+    }
+
+    private async void OnTopInsetTimerTick(object? sender, EventArgs e)
+    {
+        if (_measuringTopInset || _terminal.IsMinimized)
+        {
+            return;
+        }
+
+        _measuringTopInset = true;
+        try
+        {
+            int? topInset = await Task.Run(_terminal.MeasureTopInset);
+            if (topInset is not null && topInset != _measuredTopInset)
+            {
+                _measuredTopInset = topInset;
+                Reposition();
+            }
+        }
+        finally
+        {
+            _measuringTopInset = false;
+        }
+    }
+
+    private void OnViewerInitializationCompleted(object? sender, CoreWebView2InitializationCompletedEventArgs e)
+    {
+        if (!e.IsSuccess)
+        {
+            ShowMessage($"Couldn't start WebView2: {e.InitializationException.Message}");
+        }
+    }
+
+    // Minimized, the overlay shrinks to a small button in the terminal's top-right corner. The server and page keep
+    // running, so restoring is instant.
+    private void SetCollapsed(bool collapsed)
+    {
+        ExpandedPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        CollapsedButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+
+        // Windows 11 rounds the button's corners. The docked panel stays square so it sits flush with the terminal.
+        int corners = collapsed ? NativeMethods.DwmCornerRoundSmall : NativeMethods.DwmCornerDoNotRound;
+        NativeMethods.DwmSetWindowAttribute(_handle, NativeMethods.DwmWindowCornerPreference, ref corners, sizeof(int));
         Reposition();
     }
 
@@ -77,6 +144,7 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _topInsetTimer.Stop();
         _tracker?.Dispose();
         Viewer.Dispose();
     }
@@ -90,12 +158,20 @@ public partial class MainWindow : Window
         }
 
         double scale = _terminal.DpiScale;
-        PixelRect dock = DockLayout.Calculate(
-            terminalBounds,
-            _settings.WidthFraction,
-            (int)Math.Round(_terminal.TopInset * scale),
-            (int)Math.Round(MinimumOverlayWidth * scale),
-            (int)Math.Round(MinimumTerminalWidth * scale));
+        int topInset = _measuredTopInset ?? (int)Math.Round(_terminal.DefaultTopInset * scale);
+        PixelRect dock = _settings.Collapsed
+            ? DockLayout.CalculateButton(
+                terminalBounds,
+                (int)Math.Round(CollapsedButtonSize * scale),
+                topInset,
+                (int)Math.Round(CollapsedButtonRightMargin * scale),
+                (int)Math.Round(CollapsedButtonTopMargin * scale))
+            : DockLayout.Calculate(
+                terminalBounds,
+                _settings.WidthFraction,
+                topInset,
+                (int)Math.Round(MinimumOverlayWidth * scale),
+                (int)Math.Round(MinimumTerminalWidth * scale));
 
         NativeMethods.SetWindowPos(
             _handle,
@@ -145,6 +221,20 @@ public partial class MainWindow : Window
             ResizeGrip.ReleaseMouseCapture();
             _settings.Save();
         }
+    }
+
+    private void OnMinimizeClick(object sender, RoutedEventArgs e)
+    {
+        _settings.Collapsed = true;
+        _settings.Save();
+        SetCollapsed(true);
+    }
+
+    private void OnRestoreClick(object sender, RoutedEventArgs e)
+    {
+        _settings.Collapsed = false;
+        _settings.Save();
+        SetCollapsed(false);
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e)

@@ -43,6 +43,14 @@ if (-not $needsBuild) {
     $needsBuild = [bool]($sources | Where-Object { $_.LastWriteTime -gt $builtAt })
 }
 
+# An open overlay locks its program file, so it can't be rebuilt until every overlay is closed.
+$running = Get-Process -Name GitGraph.Overlay -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -eq (Resolve-Path -LiteralPath $executable -ErrorAction SilentlyContinue).ProviderPath }
+if ($needsBuild -and $running) {
+    Write-Warning 'The git graph overlay has changed, but an open overlay is using it. Close all overlays to update it. Starting the current version.'
+    $needsBuild = $false
+}
+
 if ($needsBuild) {
     Write-Host 'Building the git graph overlay...'
     dotnet build $project --configuration Release --nologo --verbosity quiet

@@ -14,6 +14,8 @@
         <Style x:Key="HeaderButtonStyle"
                TargetType="Button">
             <Setter Property="Width" Value="32" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="10" />
             <Setter Property="Foreground" Value="{DynamicResource OverlayMutedForeground}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Cursor" Value="Hand" />
@@ -34,45 +36,94 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="CollapsedButtonStyle"
+               TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource OverlayMutedForeground}" />
+            <Setter Property="Background" Value="{DynamicResource OverlayHeaderBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource OverlayBorder}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource OverlayForeground}" />
+                    <Setter Property="Background" Value="{DynamicResource OverlayHoverBackground}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
-    <Grid ColumnDefinitions="6, *">
-        <Border x:Name="ResizeGrip"
-                Background="{DynamicResource OverlayHeaderBackground}"
-                BorderBrush="{DynamicResource OverlayBorder}"
-                BorderThickness="1,0,0,0"
-                Cursor="SizeWE"
-                MouseLeftButtonDown="OnResizeGripMouseLeftButtonDown"
-                MouseLeftButtonUp="OnResizeGripMouseLeftButtonUp"
-                MouseMove="OnResizeGripMouseMove"
-                ToolTip="Drag to resize. Double-click to reset." />
+    <Grid>
+        <Grid x:Name="ExpandedPanel"
+              ColumnDefinitions="6, *">
+            <Border x:Name="ResizeGrip"
+                    Background="{DynamicResource OverlayHeaderBackground}"
+                    BorderBrush="{DynamicResource OverlayBorder}"
+                    BorderThickness="1,0,0,0"
+                    Cursor="SizeWE"
+                    MouseLeftButtonDown="OnResizeGripMouseLeftButtonDown"
+                    MouseLeftButtonUp="OnResizeGripMouseLeftButtonUp"
+                    MouseMove="OnResizeGripMouseMove"
+                    ToolTip="Drag to resize. Double-click to reset." />
 
-        <Grid RowDefinitions="28, *"
-              Grid.Column="1">
-            <Grid ColumnDefinitions="*, Auto"
-                  Background="{DynamicResource OverlayHeaderBackground}">
-                <TextBlock VerticalAlignment="Center"
-                           Margin="10,0"
-                           FontSize="11"
-                           FontWeight="Bold"
-                           Foreground="{DynamicResource OverlayMutedForeground}"
-                           Text="GIT GRAPH" />
-                <Button Grid.Column="1"
-                        Content="✕"
-                        Click="OnCloseClick"
-                        Style="{StaticResource HeaderButtonStyle}"
-                        ToolTip="Close" />
+            <Grid RowDefinitions="28, *"
+                  Grid.Column="1">
+                <Grid ColumnDefinitions="*, Auto, Auto"
+                      Background="{DynamicResource OverlayHeaderBackground}">
+                    <TextBlock VerticalAlignment="Center"
+                               Margin="10,0"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource OverlayMutedForeground}"
+                               Text="GIT GRAPH" />
+                    <Button Grid.Column="1"
+                            Content="&#xE921;"
+                            AutomationProperties.Name="Minimize git graph"
+                            Click="OnMinimizeClick"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            ToolTip="Minimize to a button" />
+                    <Button Grid.Column="2"
+                            Content="&#xE8BB;"
+                            AutomationProperties.Name="Close git graph"
+                            Click="OnCloseClick"
+                            Style="{StaticResource HeaderButtonStyle}"
+                            ToolTip="Close" />
+                </Grid>
+
+                <TextBlock x:Name="MessageText"
+                           Grid.Row="1"
+                           Margin="16"
+                           Foreground="{DynamicResource OverlayForeground}"
+                           Text="Starting the git graph server…"
+                           TextWrapping="Wrap" />
+                <wv2:WebView2 x:Name="Viewer"
+                              Grid.Row="1"
+                              Visibility="Collapsed" />
             </Grid>
-
-            <TextBlock x:Name="MessageText"
-                       Grid.Row="1"
-                       Margin="16"
-                       Foreground="{DynamicResource OverlayForeground}"
-                       Text="Starting the git graph server…"
-                       TextWrapping="Wrap" />
-            <wv2:WebView2 x:Name="Viewer"
-                          Grid.Row="1"
-                          Visibility="Collapsed" />
         </Grid>
+
+        <Button x:Name="CollapsedButton"
+                Visibility="Collapsed"
+                AutomationProperties.Name="Show git graph"
+                Click="OnRestoreClick"
+                Style="{StaticResource CollapsedButtonStyle}"
+                ToolTip="Show the git graph">
+            <!-- A small commit graph: two commits on one line and a branch merging into it. -->
+            <Path Width="16"
+                  Height="16"
+                  Data="M5,2.25 A1.75,1.75 0 1 1 5,5.75 A1.75,1.75 0 1 1 5,2.25 M5,10.25 A1.75,1.75 0 1 1 5,13.75 A1.75,1.75 0 1 1 5,10.25 M11,5.25 A1.75,1.75 0 1 1 11,8.75 A1.75,1.75 0 1 1 11,5.25 M5,5.75 L5,10.25 M11,8.75 C11,10.5 5,9 5,10.25"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.5" />
+        </Button>
     </Grid>
 </Window>

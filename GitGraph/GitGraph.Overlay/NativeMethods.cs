@@ -10,6 +10,9 @@ internal static class NativeMethods
     public const uint AttachParentProcess = unchecked((uint)-1);
     public const uint GetAncestorRootOwner = 3;
     public const int DwmExtendedFrameBounds = 9;
+    public const int DwmWindowCornerPreference = 33;
+    public const int DwmCornerDoNotRound = 1;
+    public const int DwmCornerRoundSmall = 3;
 
     public const uint EventSystemMinimizeEnd = 0x0017;
     public const uint EventObjectDestroy = 0x8001;
@@ -120,4 +123,7 @@ internal static class NativeMethods
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmGetWindowAttribute(nint window, int attribute, out Rect value, int size);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(nint window, int attribute, ref int value, int size);
 }
