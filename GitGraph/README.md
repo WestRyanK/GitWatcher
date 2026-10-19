@@ -5,7 +5,11 @@ and HEAD, and updates while you work. Click a commit to see its full message, au
 
 ## Running it
 
-In the Claude Code desktop app, start **git-graph** from the Browser pane's **Dev servers** menu. The entry is in
+In Claude Code, type `/git-graph` (or ask Claude to open the git graph). In the desktop app it opens the viewer in
+the Browser pane. In the terminal it starts the server and gives you the URL. The skill is in
+[`.claude/skills/git-graph`](../.claude/skills/git-graph/SKILL.md).
+
+You can also start **git-graph** from the desktop app's Browser pane **Dev servers** menu. The entry is in
 [`.claude/launch.json`](../.claude/launch.json).
 
 From a terminal:
