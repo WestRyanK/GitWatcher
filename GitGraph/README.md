@@ -21,6 +21,36 @@ node GitGraph/server.js
 Then open <http://localhost:4173>. Set `PORT` to use a different port. Pass a path as the first argument to view a
 different repository.
 
+## Docked in Windows Terminal
+
+From PowerShell in Windows Terminal (or a classic console window), run:
+
+```powershell
+.\GitGraph\Show-GitGraph.ps1
+```
+
+This opens the viewer in a panel docked to the right side of that terminal window, below its tabs. The panel
+follows the window when you move or resize it, hides when you minimize it, and closes when you close the window
+or exit the shell. Drag the panel's left edge to change its width (double-click the edge to reset it). The width
+is saved in `~/.git-graph/overlay.json`. To open the panel by typing `gg`, add an alias to your PowerShell profile:
+
+```powershell
+Set-Alias gg D:\source\GitHub\GitWatcher\GitGraph\Show-GitGraph.ps1
+```
+
+The panel is `GitGraph.Overlay`, a small WPF app. `Show-GitGraph.ps1` builds it on first use, and again whenever
+its sources change. It needs the .NET 10 SDK, Node.js, and the WebView2 runtime, which comes with Windows 11. How
+it works:
+
+* It finds the terminal window through the console of the shell that started it: Windows Terminal owns that
+  console's hidden window. `--terminal-window <hwnd>` picks a window directly.
+* The panel is an owned window of the terminal window, so it stays just above the terminal (not above every
+  window) and hides with it. A `SetWinEventHook` location-change hook keeps it docked. Nothing is injected into
+  Windows Terminal, and Windows Terminal's own window isn't changed.
+* It starts its own `server.js` on a free port for the shell's current folder, shows it with WebView2, and stops the
+  server when it closes. The server also exits on its own if the panel's process goes away. The page settings are
+  shared with the browser view.
+
 ## How it works
 
 * `server.js` uses only Node's built-in modules (no `npm install`). It listens on `127.0.0.1` and runs only

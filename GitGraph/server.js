@@ -476,6 +476,22 @@ const server = http.createServer(async (request, response) => {
     }
 });
 
+// When another program runs this server for itself (the Windows Terminal overlay sets GIT_GRAPH_PARENT_PID), exit
+// once that program is gone, so a crash never leaves the server running.
+const parentProcessId = Number(process.env.GIT_GRAPH_PARENT_PID) || null;
+if (parentProcessId) {
+    setInterval(() => {
+        try {
+            process.kill(parentProcessId, 0);
+        } catch (error) {
+            // EPERM means the process exists but can't be signaled.
+            if (error.code !== 'EPERM') {
+                process.exit(0);
+            }
+        }
+    }, 2000).unref();
+}
+
 server.listen(port, host, () => {
     console.log(`git-graph: serving ${repoRoot} at http://localhost:${port}`);
 });

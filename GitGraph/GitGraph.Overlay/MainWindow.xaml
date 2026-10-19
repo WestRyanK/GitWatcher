@@ -1,0 +1,78 @@
+<Window x:Class="GitGraph.Overlay.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Width="480"
+        Height="640"
+        Title="Git Graph"
+        Background="{DynamicResource OverlayBackground}"
+        ResizeMode="NoResize"
+        ShowActivated="False"
+        ShowInTaskbar="False"
+        WindowStyle="None">
+    <Window.Resources>
+        <Style x:Key="HeaderButtonStyle"
+               TargetType="Button">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Foreground" Value="{DynamicResource OverlayMutedForeground}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource OverlayForeground}" />
+                    <Setter Property="Background" Value="{DynamicResource OverlayHoverBackground}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid ColumnDefinitions="6, *">
+        <Border x:Name="ResizeGrip"
+                Background="{DynamicResource OverlayHeaderBackground}"
+                BorderBrush="{DynamicResource OverlayBorder}"
+                BorderThickness="1,0,0,0"
+                Cursor="SizeWE"
+                MouseLeftButtonDown="OnResizeGripMouseLeftButtonDown"
+                MouseLeftButtonUp="OnResizeGripMouseLeftButtonUp"
+                MouseMove="OnResizeGripMouseMove"
+                ToolTip="Drag to resize. Double-click to reset." />
+
+        <Grid RowDefinitions="28, *"
+              Grid.Column="1">
+            <Grid ColumnDefinitions="*, Auto"
+                  Background="{DynamicResource OverlayHeaderBackground}">
+                <TextBlock VerticalAlignment="Center"
+                           Margin="10,0"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource OverlayMutedForeground}"
+                           Text="GIT GRAPH" />
+                <Button Grid.Column="1"
+                        Content="✕"
+                        Click="OnCloseClick"
+                        Style="{StaticResource HeaderButtonStyle}"
+                        ToolTip="Close" />
+            </Grid>
+
+            <TextBlock x:Name="MessageText"
+                       Grid.Row="1"
+                       Margin="16"
+                       Foreground="{DynamicResource OverlayForeground}"
+                       Text="Starting the git graph server…"
+                       TextWrapping="Wrap" />
+            <wv2:WebView2 x:Name="Viewer"
+                          Grid.Row="1"
+                          Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</Window>
