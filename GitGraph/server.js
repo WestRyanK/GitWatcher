@@ -3,6 +3,7 @@
 // Usage: node GitGraph/server.js [repoPath]
 // Port comes from the PORT environment variable (default 4173).
 // The repository defaults to the one containing the current working directory.
+// The page's settings are saved per user in ~/.git-graph/settings.json (or GIT_GRAPH_SETTINGS), never in the repo.
 
 'use strict';
 
@@ -10,12 +11,16 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
 const { execFile } = require('node:child_process');
 
 const port = Number(process.env.PORT) || 4173;
 const host = '127.0.0.1';
 const publicDir = path.join(__dirname, 'public');
 const maxCommitLimit = 20000;
+const settingsPath = process.env.GIT_GRAPH_SETTINGS || path.join(os.homedir(), '.git-graph', 'settings.json');
+const maxSettingsBytes = 64 * 1024;
+const settingKeyPattern = /^git-graph\.[\w.-]{1,100}$/;
 
 // Only these git subcommands are ever run. All of them are read-only. `status` normally refreshes the index,
 // but GIT_OPTIONAL_LOCKS=0 (set in runGit) stops it from writing.
@@ -325,6 +330,61 @@ async function getStatus() {
     return status;
 }
 
+async function readSettings() {
+    try {
+        const settings = JSON.parse(await fs.promises.readFile(settingsPath, 'utf8'));
+        return settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {};
+    } catch {
+        // A missing or damaged file means no saved settings yet.
+        return {};
+    }
+}
+
+// Accepts only a flat object of "git-graph.*" keys with short string values.
+function validateSettings(settings) {
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+        return false;
+    }
+    return Object.entries(settings).every(([key, value]) =>
+        settingKeyPattern.test(key) && typeof value === 'string' && value.length <= 1000);
+}
+
+async function writeSettings(settings) {
+    await fs.promises.mkdir(path.dirname(settingsPath), { recursive: true });
+    // Write a temporary file and rename it, so a crash never leaves half a file.
+    const temporaryPath = `${settingsPath}.${process.pid}.tmp`;
+    await fs.promises.writeFile(temporaryPath, JSON.stringify(settings, null, 2), 'utf8');
+    await fs.promises.rename(temporaryPath, settingsPath);
+}
+
+function readRequestBody(request) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+        request.on('data', (chunk) => {
+            size += chunk.length;
+            if (size > maxSettingsBytes) {
+                reject(new Error('Request body is too large.'));
+                request.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+        request.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        request.on('error', reject);
+    });
+}
+
+// Saving settings is the only write. Requiring a JSON content type and this page's own origin stops other
+// websites from changing them: a cross-site JSON request needs a CORS preflight, which this server never allows.
+function isSameOriginJsonRequest(request) {
+    const contentType = (request.headers['content-type'] || '').split(';')[0].trim();
+    const origin = request.headers.origin;
+    const hostHeader = request.headers.host;
+    return contentType === 'application/json' && Boolean(origin) && Boolean(hostHeader)
+        && (origin === `http://${hostHeader}`);
+}
+
 const staticFiles = {
     '/': { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/index.html': { file: 'index.html', type: 'text/html; charset=utf-8' },
@@ -341,14 +401,34 @@ function sendJson(response, statusCode, body) {
 }
 
 const server = http.createServer(async (request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-        sendJson(response, 405, { error: 'Read-only server: only GET is supported.' });
-        return;
-    }
-
     const url = new URL(request.url, `http://${host}`);
 
     try {
+        if (url.pathname === '/api/settings' && request.method === 'PUT') {
+            if (!isSameOriginJsonRequest(request)) {
+                sendJson(response, 403, { error: 'Settings can only be saved from the viewer page.' });
+                return;
+            }
+            const settings = JSON.parse(await readRequestBody(request));
+            if (!validateSettings(settings)) {
+                sendJson(response, 400, { error: 'Settings must be an object of git-graph.* string values.' });
+                return;
+            }
+            await writeSettings(settings);
+            sendJson(response, 200, { saved: true });
+            return;
+        }
+
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+            sendJson(response, 405, { error: 'Only GET is supported, except PUT /api/settings.' });
+            return;
+        }
+
+        if (url.pathname === '/api/settings') {
+            sendJson(response, 200, await readSettings());
+            return;
+        }
+
         if (url.pathname === '/api/version') {
             sendJson(response, 200, await getVersion());
             return;

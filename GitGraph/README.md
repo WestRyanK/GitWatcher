@@ -24,8 +24,9 @@ different repository.
 ## How it works
 
 * `server.js` uses only Node's built-in modules (no `npm install`). It listens on `127.0.0.1` and runs only
-  read-only git commands (`log`, `rev-list`, `for-each-ref`, `rev-parse`, `symbolic-ref`, `show`, `diff-tree`) with
-  `GIT_OPTIONAL_LOCKS=0`. It rejects any request other than `GET`.
+  read-only git commands (`log`, `rev-list`, `for-each-ref`, `rev-parse`, `symbolic-ref`, `show`, `diff-tree`,
+  `status`) with `GIT_OPTIONAL_LOCKS=0`. It never writes to the repository. The only request that writes anything
+  is `PUT /api/settings` (see below); it rejects every other request that isn't `GET`.
 * `GET /api/graph?scope=S&limit=N` returns commits from `git log --topo-order`, plus refs and HEAD. The page's
   **Commits from** selector sets the scope: `current` (`HEAD` only), `local` (`--branches` and `HEAD`), or `all`
   (`--all`, which also includes remote branches and tags).
@@ -40,8 +41,13 @@ different repository.
 * The commit details are below the graph. Click a pane's title to collapse it toward its edge: **Commits** and
   **Commit details** collapse to their headers, and **Branches** or **Status** collapse the sidebar sideways to a
   narrow rail. Click a title in the rail to expand the sidebar again. Drag any divider to resize the panes (arrow
-  keys work too when a divider has focus, and double-click resets it). The page remembers these choices in the
-  browser's local storage.
+  keys work too when a divider has focus, and double-click resets it).
+* The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the
+  **Remote** checkbox, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings` read and save
+  them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so they
+  survive restarts, port changes, and cleared browser data, and every worktree shares them. The server only
+  accepts a save that comes from the viewer page itself: it must be JSON from the same origin, holding
+  `git-graph.*` string values.
 * `GET /api/commit/<hash>` returns the commit's message and its changed files. A merge's files are compared with
   its first parent.
 * `public/app.js` lays the commits out in lanes and draws the graph as plain SVG.

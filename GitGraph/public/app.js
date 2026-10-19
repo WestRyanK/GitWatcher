@@ -327,6 +327,7 @@ function selectCommit(hash, scrollIntoView) {
         element.classList.remove('selected');
     }
     state.selectedHash = hash;
+    writeSetting(settingKeys.selectedCommit, hash);
     const row = state.rowByHash.get(hash);
     if (row) {
         row.classList.add('selected');
@@ -468,31 +469,89 @@ function renderDetails(details) {
 }
 
 const settingKeys = {
+    scope: 'git-graph.scope',
+    limit: 'git-graph.limit',
+    autoRefresh: 'git-graph.auto-refresh',
+    commitFilter: 'git-graph.commit-filter',
+    branchFilter: 'git-graph.branch-filter',
+    selectedCommit: 'git-graph.selected-commit',
     showRemoteBranches: 'git-graph.show-remote-branches',
     collapsedPrefix: 'git-graph.collapsed.',
 };
 const keyboardResizeStep = 24;
+const settingsSaveDelayMs = 300;
 
-// Storage can be unavailable (private windows, blocked site data). Settings then last until the page reloads.
+// Settings live in a per-user file that the server reads and writes (/api/settings), so they don't depend on the
+// browser keeping site data or on the server getting the same port. The page keeps a copy in memory, and saves
+// changes shortly after they happen.
+const settings = {
+    values: {},
+    saveTimer: null,
+};
+
 function readSetting(key) {
-    try {
-        return localStorage.getItem(key);
-    } catch {
-        return null;
-    }
+    return Object.hasOwn(settings.values, key) ? settings.values[key] : null;
 }
 
 function writeSetting(key, value) {
+    if (value === null) {
+        delete settings.values[key];
+    } else {
+        settings.values[key] = String(value);
+    }
+    clearTimeout(settings.saveTimer);
+    settings.saveTimer = setTimeout(saveSettings, settingsSaveDelayMs);
+}
+
+function saveSettings(keepalive = false) {
+    clearTimeout(settings.saveTimer);
+    settings.saveTimer = null;
+    return fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings.values),
+        keepalive,
+    }).catch(() => {
+        // The next change saves everything again.
+    });
+}
+
+// Older versions of the page kept settings in local storage. Move them over the first time.
+function readLegacySettings() {
+    const legacy = {};
     try {
-        if (value === null) {
-            localStorage.removeItem(key);
-        } else {
-            localStorage.setItem(key, value);
+        for (let index = 0; index < localStorage.length; index++) {
+            const key = localStorage.key(index);
+            if (key.startsWith('git-graph.')) {
+                legacy[key] = localStorage.getItem(key);
+            }
         }
     } catch {
-        // Ignore; see readSetting.
+        // Local storage can be unavailable; there is nothing to move then.
+    }
+    return legacy;
+}
+
+async function loadSettings() {
+    try {
+        settings.values = await fetchJson('/api/settings');
+    } catch {
+        settings.values = {};
+    }
+    if (Object.keys(settings.values).length === 0) {
+        const legacy = readLegacySettings();
+        if (Object.keys(legacy).length > 0) {
+            settings.values = legacy;
+            await saveSettings();
+        }
     }
 }
+
+window.addEventListener('pagehide', () => {
+    if (settings.saveTimer !== null) {
+        saveSettings(true);
+    }
+});
 
 function readBooleanSetting(key, defaultValue) {
     const value = readSetting(key);
@@ -883,7 +942,56 @@ elements.refresh.addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', poll);
 
-loadLayoutSettings();
-loadGraph();
-loadWorkingTree();
-setInterval(poll, pollIntervalMs);
+// Toolbar and filter controls whose values are remembered.
+const rememberedControls = [
+    { element: elements.scope, key: settingKeys.scope, event: 'change' },
+    { element: elements.limit, key: settingKeys.limit, event: 'change' },
+    { element: elements.autoRefresh, key: settingKeys.autoRefresh, event: 'change', checkbox: true },
+    { element: elements.filter, key: settingKeys.commitFilter, event: 'input' },
+    { element: elements.branchFilter, key: settingKeys.branchFilter, event: 'input' },
+];
+
+function restoreControls() {
+    for (const control of rememberedControls) {
+        const saved = readSetting(control.key);
+        if (saved === null) {
+            continue;
+        }
+        if (control.checkbox) {
+            control.element.checked = saved === 'true';
+            continue;
+        }
+        const defaultValue = control.element.value;
+        control.element.value = saved;
+        // A select ends up with no value when the saved one is no longer an option.
+        if (control.element.value !== saved) {
+            control.element.value = defaultValue;
+        }
+    }
+}
+
+for (const control of rememberedControls) {
+    control.element.addEventListener(control.event, () => {
+        writeSetting(control.key, control.checkbox ? String(control.element.checked) : control.element.value);
+    });
+}
+
+// Selects the commit selected last time, if it's in the graph.
+function restoreSelection() {
+    const hash = readSetting(settingKeys.selectedCommit);
+    if (hash && state.rowByHash.has(hash)) {
+        selectCommit(hash, true);
+    }
+}
+
+async function initialize() {
+    await loadSettings();
+    loadLayoutSettings();
+    restoreControls();
+    await loadGraph();
+    restoreSelection();
+    loadWorkingTree();
+    setInterval(poll, pollIntervalMs);
+}
+
+initialize();
