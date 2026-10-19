@@ -71,29 +71,113 @@ body {
     color: var(--muted);
 }
 
+/* One line: the repository and HEAD on the left, then the status and the Options button. The filters and settings
+   open in a panel that floats over the content, so the toolbar never takes more than one line. */
 .toolbar {
+    position: relative;
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
+    gap: 12px;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
+    padding: 6px 12px 6px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-alt);
 }
 
 .title {
     display: flex;
+    flex: 1;
     gap: 10px;
     align-items: baseline;
     min-width: 0;
+    white-space: nowrap;
 }
 
-.controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 12px;
+.title #head-info {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.status-text {
+    flex: none;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.options-toggle {
+    display: inline-flex;
+    flex: none;
     align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+.options-toggle:hover,
+.options-toggle:focus-visible,
+.options-toggle[aria-expanded="true"] {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.options-toggle svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
+.options-toggle svg circle {
+    fill: var(--bg);
+}
+
+
+.options {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 12px;
+    z-index: 20;
+    display: grid;
+    gap: 10px;
+    width: min(320px, calc(100vw - 24px));
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-alt);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.options[hidden] {
+    display: none;
+}
+
+.options label {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.options .option-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.options .option-check {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--fg);
 }
 
 .controls input[type="search"],
@@ -104,18 +188,21 @@ body {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 3px 8px;
+    padding: 4px 8px;
 }
 
-.controls input[type="search"] {
-    width: 220px;
-    max-width: 100%;
+.controls input[type="search"],
+.controls select {
+    width: 100%;
 }
 
 .controls button {
     cursor: pointer;
 }
 
+.controls button:hover {
+    background: var(--bg-hover);
+}
 
 .workspace {
     flex: 1;

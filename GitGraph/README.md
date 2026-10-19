@@ -90,6 +90,8 @@ runtime, which comes with Windows 11. How it works:
 * `GET /api/status` returns `git status --porcelain=v2 --branch` for the folder the server runs in: conflicts,
   staged, unstaged, and untracked files. The **Status** pane polls it with the graph. `GIT_OPTIONAL_LOCKS=0` stops
   `git status` from writing its refreshed index.
+* The commit filter, **Commits from**, **Show**, and **Live** are in the **Options** menu (the sliders icon at the
+  top right), which keeps the toolbar to one line.
 * The commit details are below the graph. Click a pane's title to collapse it toward its edge: **Commits** and
   **Commit details** collapse to their headers, and **Branches** or **Status** collapse the sidebar sideways to a
   narrow rail. Click a title in the rail to expand the sidebar again. Drag any divider to resize the panes (arrow

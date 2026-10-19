@@ -12,8 +12,21 @@
             <strong id="repo-name">Git Graph</strong>
             <span id="head-info" class="muted"></span>
         </div>
-        <div class="controls">
-            <input id="filter" type="search" placeholder="Filter subject, author, hash" aria-label="Filter commits">
+        <span id="status" class="muted status-text" aria-live="polite"></span>
+        <button id="options-toggle" class="options-toggle" type="button" aria-expanded="false" aria-controls="options"
+            aria-haspopup="true" aria-label="Options" title="Options: filters and settings">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M2 4h7M13 4h1M2 12h1M7 12h7M2 8h3M9 8h5" />
+                <circle cx="11" cy="4" r="1.75" />
+                <circle cx="5" cy="12" r="1.75" />
+                <circle cx="7" cy="8" r="1.75" />
+            </svg>
+        </button>
+        <div id="options" class="options controls" role="group" aria-label="Filters and settings" hidden>
+            <label class="option-wide">
+                Filter
+                <input id="filter" type="search" placeholder="Subject, author, or hash" aria-label="Filter commits">
+            </label>
             <label>
                 Commits from
                 <select id="scope">
@@ -32,9 +45,10 @@
                     <option value="20000">All</option>
                 </select>
             </label>
-            <label><input id="auto-refresh" type="checkbox" checked> Live</label>
-            <button id="refresh" type="button">Refresh</button>
-            <span id="status" class="muted" aria-live="polite"></span>
+            <div class="option-row">
+                <label class="option-check"><input id="auto-refresh" type="checkbox" checked> Live updates</label>
+                <button id="refresh" type="button">Refresh now</button>
+            </div>
         </div>
     </header>
     <main id="workspace" class="workspace">

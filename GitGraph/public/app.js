@@ -35,6 +35,9 @@ const elements = {
     autoRefresh: document.getElementById('auto-refresh'),
     refresh: document.getElementById('refresh'),
     status: document.getElementById('status'),
+    optionsToggle: document.getElementById('options-toggle'),
+    options: document.getElementById('options'),
+
     graphScroll: document.getElementById('graph-scroll'),
     graph: document.getElementById('graph'),
     details: document.getElementById('details'),
@@ -975,6 +978,36 @@ for (const control of rememberedControls) {
         writeSetting(control.key, control.checkbox ? String(control.element.checked) : control.element.value);
     });
 }
+
+
+// The Options menu holds the commit filter and the graph settings.
+function setOptionsOpen(open) {
+    elements.options.hidden = !open;
+    elements.optionsToggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+        elements.filter.focus();
+    }
+}
+
+elements.optionsToggle.addEventListener('click', () => {
+    setOptionsOpen(elements.options.hidden);
+});
+
+// Clicking anywhere else, or pressing Escape, closes the menu.
+document.addEventListener('pointerdown', (event) => {
+    if (!elements.options.hidden
+        && !elements.options.contains(event.target)
+        && !elements.optionsToggle.contains(event.target)) {
+        setOptionsOpen(false);
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !elements.options.hidden) {
+        setOptionsOpen(false);
+        elements.optionsToggle.focus();
+    }
+});
 
 // Selects the commit selected last time, if it's in the graph.
 function restoreSelection() {
