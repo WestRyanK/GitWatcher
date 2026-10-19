@@ -450,13 +450,6 @@ body.resizing.resizing-rows {
 .pane-toggle[aria-expanded="false"] .chevron {
     transform: rotate(-90deg);
 }
-.pane-option {
-    margin-left: auto;
-    font-size: 12px;
-    color: var(--muted);
-    white-space: nowrap;
-}
-
 .pane-filter {
     margin: 0 12px 6px;
     font: inherit;

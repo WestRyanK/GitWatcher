@@ -85,8 +85,10 @@ runtime, which comes with Windows 11. How it works:
 * `GET /api/version` returns a fingerprint of the refs and HEAD. The page polls it every 3 seconds and reloads the
   graph when it changes. This covers new commits, branch moves, and checkouts.
 * `GET /api/branches` returns local and remote branches from `git for-each-ref`, with each local branch's upstream,
-  ahead/behind counts, and the worktree it's checked out in. The **Branches** pane lists them in folders by name
-  (`claude/...` under **claude**), which open and close with a click. Click a branch to jump to its tip commit.
+  ahead/behind counts, and the worktree it's checked out in, plus every tag, by name. The **Branches** pane
+  shows them as a tree: a **Branches** node for the local branches, and **Remote branches** and **Tags** nodes,
+  which start closed. Inside them, branches are in folders by name (`claude/...` under **claude**). Nodes and
+  folders open and close with a click. Click a branch or tag to jump to its commit.
 * `GET /api/status` returns `git status --porcelain=v2 --branch` for the folder the server runs in: conflicts,
   staged, unstaged, and untracked files. The **Status** pane polls it with the graph. `GIT_OPTIONAL_LOCKS=0` stops
   `git status` from writing its refreshed index.
@@ -102,12 +104,12 @@ runtime, which comes with Windows 11. How it works:
   and the columns after it move along. Dragging the author or date column down to nothing hides it (drag its edge
   back out to show it again). Double-click an edge to reset the column. Narrow windows start without the author and
   date.
-* The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the
-  **Remote** checkbox, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings` read and save
-  them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so they
-  survive restarts, port changes, and cleared browser data, and every worktree shares them. The server only
-  accepts a save that comes from the viewer page itself: it must be JSON from the same origin, holding
-  `git-graph.*` string values.
+* The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the open
+  nodes and folders in the branch tree, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings`
+  read and save them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so
+  they survive restarts, port changes, and cleared browser data, and every worktree shares them. The server only accepts
+  a save that comes from the viewer page itself: it must be JSON from the same origin, holding `git-graph.*` string
+  values.
 * `GET /api/commit/<hash>` returns the commit's message and its changed files. A merge's files are compared with
   its first parent.
 * `public/app.js` lays the commits out in lanes and draws the graph as plain SVG.

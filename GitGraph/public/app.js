@@ -27,7 +27,6 @@ const elements = {
     detailsPane: document.getElementById('details-pane'),
     branchesPane: document.getElementById('branches-pane'),
     branchesCount: document.getElementById('branches-count'),
-    showRemoteBranches: document.getElementById('show-remote-branches'),
     branchFilter: document.getElementById('branch-filter'),
     branches: document.getElementById('branches'),
     workingTreePane: document.getElementById('working-tree-pane'),
@@ -486,7 +485,6 @@ const settingKeys = {
     commitFilter: 'git-graph.commit-filter',
     branchFilter: 'git-graph.branch-filter',
     selectedCommit: 'git-graph.selected-commit',
-    showRemoteBranches: 'git-graph.show-remote-branches',
     collapsedPrefix: 'git-graph.collapsed.',
 };
 const keyboardResizeStep = 24;
@@ -717,7 +715,10 @@ function setPaneCollapsed(paneId, collapsed) {
 }
 
 function loadLayoutSettings() {
-    elements.showRemoteBranches.checked = readBooleanSetting(settingKeys.showRemoteBranches, false);
+    // Earlier versions had a Remote checkbox; the Remote branches node replaced it.
+    if (readSetting('git-graph.show-remote-branches') !== null) {
+        writeSetting('git-graph.show-remote-branches', null);
+    }
 
     // Earlier versions collapsed the Branches and Status panes together as the whole sidebar.
     const legacySidebarKey = `${settingKeys.collapsedPrefix}sidebar`;
@@ -755,10 +756,6 @@ for (const toggle of paneToggles) {
     });
 }
 
-elements.showRemoteBranches.addEventListener('change', () => {
-    writeSetting(settingKeys.showRemoteBranches, String(elements.showRemoteBranches.checked));
-    renderBranches();
-});
 
 elements.branchFilter.addEventListener('input', renderBranches);
 
@@ -817,6 +814,12 @@ function createBranchItem(branch, displayName = branch.name, depth = 0) {
     item.appendChild(createElement('span', 'branch-subject', `${formatDate(branch.date)} · ${branch.subject}`));
     return item;
 }
+
+// The Remote branches and Tags nodes are closed by default, unlike the branch folders, so each has its own setting.
+const closedByDefaultNodes = {
+    remote: 'git-graph.remote-branches-open',
+    tags: 'git-graph.tags-open',
+};
 
 // Branch folders collapsed by the user, by path ("local:claude", "remote:origin/claude"). Folders are open by default.
 const branchFolderSettingKey = 'git-graph.collapsed-branch-folders';
@@ -877,36 +880,60 @@ function treeHasCurrentBranch(node) {
 
 // Folders come first, alphabetically, then the folder's branches in the order they were given. While filtering,
 // every folder is open, so all matches show.
-function appendBranchTree(fragment, node, depth, pathPrefix, filtering) {
+function appendBranchTree(fragment, node, depth, pathPrefix, filtering, createItem = createBranchItem) {
     const folderNames = [...node.folders.keys()].sort((a, b) => a.localeCompare(b));
     for (const name of folderNames) {
         const folder = node.folders.get(name);
         const path = `${pathPrefix}${name}`;
         const collapsed = !filtering && getCollapsedBranchFolders().has(path);
 
-        const row = createElement('button', 'branch-folder');
-        row.type = 'button';
-        row.dataset.path = path;
-        row.setAttribute('aria-expanded', String(!collapsed));
-        indentBranchRow(row, depth);
-        row.innerHTML = '<svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
-        row.appendChild(createElement('span', 'branch-folder-name', name));
-        if (collapsed && treeHasCurrentBranch(folder)) {
-            const marker = createElement('span', 'current-marker');
-            marker.title = 'Contains the current branch (HEAD)';
-            row.appendChild(marker);
-        }
-        row.appendChild(createElement('span', 'branch-folder-count', String(countTreeBranches(folder))));
-        fragment.appendChild(row);
-
+        const hasCurrent = collapsed && treeHasCurrentBranch(folder);
+        fragment.appendChild(createFolderRow(name, path, depth, !collapsed, countTreeBranches(folder), hasCurrent));
         if (!collapsed) {
-            appendBranchTree(fragment, folder, depth + 1, `${path}/`, filtering);
+            appendBranchTree(fragment, folder, depth + 1, `${path}/`, filtering, createItem);
         }
     }
 
     for (const entry of node.branches) {
-        fragment.appendChild(createBranchItem(entry.branch, entry.leafName, depth));
+        fragment.appendChild(createItem(entry.branch, entry.leafName, depth));
     }
+}
+
+function createFolderRow(name, path, depth, expanded, count, hasCurrent) {
+    const row = createElement('button', 'branch-folder');
+    row.type = 'button';
+    row.dataset.path = path;
+    row.setAttribute('aria-expanded', String(expanded));
+    indentBranchRow(row, depth);
+    row.innerHTML = '<svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
+    row.appendChild(createElement('span', 'branch-folder-name', name));
+    if (hasCurrent) {
+        const marker = createElement('span', 'current-marker');
+        marker.title = 'Contains the current branch (HEAD)';
+        row.appendChild(marker);
+    }
+    row.appendChild(createElement('span', 'branch-folder-count', String(count)));
+    return row;
+}
+
+function createTagItem(tag, displayName = tag.name, depth = 0) {
+    const item = createElement('button', 'branch-item tag-item');
+    item.type = 'button';
+    indentBranchRow(item, depth);
+    item.dataset.hash = tag.hash;
+    item.dataset.name = `tag:${tag.name}`;
+    item.classList.toggle('selected', item.dataset.name === state.selectedBranch);
+    item.title = [
+        tag.name,
+        `${tag.hash.slice(0, 8)} ${tag.subject}`,
+        `${tag.annotated ? 'Tagged by' : 'Committed by'} ${tag.author}, ${formatDate(tag.date)}`,
+    ].join('\n');
+
+    const line = createElement('span', 'branch-line');
+    line.appendChild(createElement('span', 'branch-name', `🏷 ${displayName}`));
+    item.appendChild(line);
+    item.appendChild(createElement('span', 'branch-subject', `${formatDate(tag.date)} · ${tag.subject}`));
+    return item;
 }
 
 function renderBranches() {
@@ -916,31 +943,44 @@ function renderBranches() {
     }
     const query = elements.branchFilter.value.trim().toLowerCase();
     const matches = (branch) => query === '' || branch.name.toLowerCase().includes(query);
-    const showRemote = elements.showRemoteBranches.checked;
 
     // The current branch first, then the most recently updated.
     const local = data.local.filter(matches).sort((a, b) => Number(b.current) - Number(a.current) || b.date - a.date);
-    const remote = showRemote ? data.remote.filter(matches) : [];
+    const remote = data.remote.filter(matches);
 
+    const filtering = query !== '';
+    // Tags in name order, ignoring case and comparing numbers by value, so "v2026.9" comes before "v2026.10".
+    const tags = (data.tags || []).filter(matches)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     const fragment = document.createDocumentFragment();
-    if (showRemote) {
-        fragment.appendChild(createElement('div', 'pane-group', `Local (${local.length})`));
-    }
-    appendBranchTree(fragment, buildBranchTree(local), 0, 'local:', query !== '');
-    if (showRemote) {
-        fragment.appendChild(createElement('div', 'pane-group', `Remote (${remote.length})`));
-        appendBranchTree(fragment, buildBranchTree(remote), 0, 'remote:', query !== '');
-    }
-    if (local.length === 0 && remote.length === 0) {
-        fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches match.' : 'No branches.'));
+
+    // The tree has a top-level node each for the local branches, the remote branches, and the tags. Branches starts
+    // open. Remote branches and Tags start closed, because a repository can have many of them. While filtering,
+    // every node with a match is open.
+    const appendRootNode = (name, path, items, open, pathPrefix, createItem) => {
+        if (items.length === 0) {
+            return;
+        }
+        const tree = buildBranchTree(items);
+        const isOpen = filtering || open;
+        fragment.appendChild(createFolderRow(name, path, 0, isOpen, items.length, !isOpen && treeHasCurrentBranch(tree)));
+        if (isOpen) {
+            appendBranchTree(fragment, tree, 1, pathPrefix, filtering, createItem);
+        }
+    };
+    const collapsedFolders = getCollapsedBranchFolders();
+    const openByDefault = (path) => readSetting(closedByDefaultNodes[path]) === 'true';
+    appendRootNode('Branches', 'branches', local, !collapsedFolders.has('branches'), 'local:', createBranchItem);
+    appendRootNode('Remote branches', 'remote', remote, openByDefault('remote'), 'remote:', createBranchItem);
+    appendRootNode('Tags', 'tags', tags, openByDefault('tags'), 'tags:', createTagItem);
+    if (local.length === 0 && remote.length === 0 && tags.length === 0) {
+        fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches or tags match.' : 'No branches.'));
     }
 
     const scrollTop = elements.branches.scrollTop;
     elements.branches.replaceChildren(fragment);
     elements.branches.scrollTop = scrollTop;
-    elements.branchesCount.textContent = showRemote
-        ? `${data.local.length} local, ${data.remote.length} remote`
-        : `${data.local.length}`;
+    elements.branchesCount.textContent = `${data.local.length}`;
 }
 async function loadBranches() {
     if (!isPaneOpen(elements.branchesPane)) {
@@ -956,6 +996,11 @@ async function loadBranches() {
 
 elements.branches.addEventListener('click', (event) => {
     const folder = event.target.closest('.branch-folder');
+    if (folder && Object.hasOwn(closedByDefaultNodes, folder.dataset.path)) {
+        writeSetting(closedByDefaultNodes[folder.dataset.path], folder.getAttribute('aria-expanded') === 'true' ? null : 'true');
+        renderBranches();
+        return;
+    }
     if (folder) {
         const folders = getCollapsedBranchFolders();
         if (folders.has(folder.dataset.path)) {

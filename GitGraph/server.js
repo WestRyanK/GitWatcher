@@ -225,9 +225,10 @@ async function getBranches() {
         '%(HEAD)', '%(refname)', '%(objectname)', '%(upstream:short)', '%(upstream:track)',
         '%(worktreepath)', '%(committerdate:unix)', '%(authorname)', '%(contents:subject)',
     ].join(fieldSeparator);
-    const [output, toplevel] = await Promise.all([
+    const [output, toplevel, tags] = await Promise.all([
         runGit(['for-each-ref', `--format=${format}`, '--sort=-committerdate', 'refs/heads', 'refs/remotes']),
         runGitOrNull(['rev-parse', '--show-toplevel']),
+        getTags(),
     ]);
     const currentWorktree = toplevel ? path.resolve(toplevel).toLowerCase() : null;
 
@@ -265,7 +266,34 @@ async function getBranches() {
             });
         }
     }
-    return { local, remote };
+    return { local, remote, tags };
+}
+
+// Lists the tags by name. An annotated tag points at a tag object, so its hash is the commit it peels to, and its
+// date and subject are the tag's own. A lightweight tag's are its commit's.
+async function getTags() {
+    const format = [
+        '%(refname:short)', '%(objectname)', '%(*objectname)', '%(creatordate:unix)', '%(contents:subject)',
+        '%(objecttype)', '%(taggername)', '%(authorname)',
+    ].join(fieldSeparator);
+    const output = await runGit(['for-each-ref', `--format=${format}`, '--sort=refname', 'refs/tags']);
+
+    const tags = [];
+    for (const line of output.split('\n')) {
+        if (!line) {
+            continue;
+        }
+        const [name, objectName, peeledName, timestamp, subject, objectType, tagger, author] = line.split(fieldSeparator);
+        tags.push({
+            name,
+            hash: peeledName || objectName,
+            date: Number(timestamp) * 1000,
+            subject,
+            annotated: objectType === 'tag',
+            author: tagger || author,
+        });
+    }
+    return tags;
 }
 
 // Parses `git status --porcelain=v2 --branch -z`. See git-status(1), "Porcelain Format Version 2".
