@@ -110,6 +110,16 @@
                             <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Commits
                         </button>
                     </h2>
+                    <!-- Labels for the columns on the right of each commit, in the title row so they take no extra
+                         space. The edge before a label resizes the column to its left; app.js places the labels. -->
+                    <div id="column-headers" class="column-headers">
+                        <span class="column-header" data-column="author"><span class="column-label">Author</span><span
+                                class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
+                        <span class="column-header" data-column="date"><span class="column-label">Date</span><span
+                                class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
+                        <span class="column-header" data-column="hash"><span class="column-label">Commit</span><span
+                                class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
+                    </div>
                 </header>
                 <div id="graph-scroll" class="graph-scroll">
                     <div id="graph" class="graph"></div>

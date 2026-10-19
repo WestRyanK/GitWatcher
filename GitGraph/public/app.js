@@ -40,6 +40,8 @@ const elements = {
     options: document.getElementById('options'),
 
     graphScroll: document.getElementById('graph-scroll'),
+    graphPane: document.getElementById('graph-pane'),
+    columnHeaders: document.getElementById('column-headers'),
     graph: document.getElementById('graph'),
     details: document.getElementById('details'),
 };
@@ -237,24 +239,29 @@ function render(data) {
         element.dataset.hash = commit.hash;
         element.dataset.search = `${commit.subject}\n${commit.author}\n${commit.hash}`.toLowerCase();
 
+        // The branch and tag labels and the subject share one column, so the columns after it line up on every row.
+        const description = createElement('span', 'column col-description');
         for (const badge of badgesByHash.get(commit.hash) || []) {
             const badgeElement = createElement('span', `ref ${badge.type}`, badge.label);
             badgeElement.title = badge.label;
-            element.appendChild(badgeElement);
+            description.appendChild(badgeElement);
         }
         const subject = createElement('span', 'subject', commit.subject);
         subject.title = commit.subject;
-        element.appendChild(subject);
-        element.appendChild(createElement('span', 'meta', commit.author));
-        element.appendChild(createElement('span', 'meta', formatDate(commit.date)));
-        element.appendChild(createElement('span', 'meta hash', commit.hash.slice(0, 8)));
+        description.appendChild(subject);
+        element.appendChild(description);
+        element.appendChild(createElement('span', 'meta column col-author', commit.author));
+        element.appendChild(createElement('span', 'meta column col-date', formatDate(commit.date)));
+        element.appendChild(createElement('span', 'meta column col-hash hash', commit.hash.slice(0, 8)));
 
         state.rowByHash.set(commit.hash, element);
         fragment.appendChild(element);
     }
 
     elements.graph.replaceChildren(fragment);
-    elements.graph.style.minWidth = `${width + 400}px`;
+    // The columns fit the pane instead of scrolling sideways, so their labels in the title row stay over them.
+    elements.graph.style.minWidth = `${width + 60}px`;
+    alignColumnHeaders();
     elements.graphScroll.scrollTop = scrollTop;
 
     elements.repoName.textContent = data.repo;
@@ -1032,6 +1039,108 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+// The columns after the graph: the description (branch labels and subject), author, date, and commit. Each edge in
+// the Commits title row resizes the column to its left, and the columns after it move along, like a table. Until it's
+// resized, the description fills the space; once it has a width, the commit column takes what's left. Widths are CSS
+// variables on the graph pane, and an author or date column dragged narrower than the minimum is hidden.
+const columnDefaults = { description: null, author: 110, date: 112 };
+const columnMinimumWidth = { description: 60, author: 24, date: 24 };
+const columnMaximumWidth = 2000;
+const columnWidths = {};
+
+// Which column each label's edge resizes: the one to its left.
+const resizedByEdgeOf = { author: 'description', date: 'author', hash: 'date' };
+
+function setColumnWidth(column, width) {
+    if (width === null) {
+        columnWidths[column] = null;
+        elements.graphPane.style.removeProperty(`--col-${column}`);
+        elements.graphPane.classList.remove('fixed-description');
+    } else {
+        const clamped = Math.min(Math.round(width), columnMaximumWidth);
+        const minimum = columnMinimumWidth[column];
+        const visibleWidth = clamped >= minimum ? clamped : (column === 'description' ? minimum : 0);
+        columnWidths[column] = visibleWidth;
+        elements.graphPane.style.setProperty(`--col-${column}`, `${visibleWidth}px`);
+        if (column === 'description') {
+            elements.graphPane.classList.add('fixed-description');
+        } else {
+            elements.graphPane.classList.toggle(`hide-${column}`, visibleWidth === 0);
+        }
+    }
+    alignColumnHeaders();
+}
+
+// Without saved widths, a narrow window (such as the Windows Terminal overlay) starts without the author and date.
+function loadColumnWidths() {
+    const narrow = window.innerWidth < 760;
+    for (const column of Object.keys(columnDefaults)) {
+        const saved = Number.parseInt(readSetting(`git-graph.column-${column}`) || '', 10);
+        const fallback = narrow && column !== 'description' ? 0 : columnDefaults[column];
+        setColumnWidth(column, Number.isFinite(saved) ? saved : fallback);
+    }
+}
+
+// Places each label over its column, measured from the first row, so it follows the column widths, the graph's
+// width, and the list's scroll bar. A hidden column's label shrinks to just its edge, at the next column.
+function alignColumnHeaders() {
+    const row = elements.graph.querySelector('.row');
+    elements.columnHeaders.hidden = !row;
+    if (!row) {
+        return;
+    }
+
+    const origin = elements.columnHeaders.getBoundingClientRect().left;
+    let nextLeft = null;
+    for (const header of [...elements.columnHeaders.querySelectorAll('.column-header')].reverse()) {
+        const cell = row.querySelector(`.col-${header.dataset.column}`);
+        const rect = cell.getBoundingClientRect();
+        const hidden = getComputedStyle(cell).display === 'none';
+        const left = hidden ? nextLeft : rect.left;
+        header.style.left = `${left - origin}px`;
+        header.style.width = `${hidden ? 0 : rect.width}px`;
+        nextLeft = left - (hidden ? 0 : 8);
+    }
+}
+
+new ResizeObserver(alignColumnHeaders).observe(elements.graphScroll);
+
+for (const header of elements.columnHeaders.querySelectorAll('.column-header')) {
+    const column = resizedByEdgeOf[header.dataset.column];
+    const resizer = header.querySelector('.column-resizer');
+
+    // The edge is on the right of the resized column, so dragging right widens it and moves the columns after it.
+    resizer.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        const startX = event.clientX;
+        const row = elements.graph.querySelector('.row');
+        const startWidth = columnWidths[column] ?? Math.round(row.querySelector(`.col-${column}`).getBoundingClientRect().width);
+        resizer.setPointerCapture(event.pointerId);
+        resizer.classList.add('dragging');
+        document.body.classList.add('resizing');
+
+        const onMove = (moveEvent) => setColumnWidth(column, startWidth + (moveEvent.clientX - startX));
+        const onEnd = () => {
+            resizer.removeEventListener('pointermove', onMove);
+            resizer.removeEventListener('pointerup', onEnd);
+            resizer.removeEventListener('pointercancel', onEnd);
+            resizer.classList.remove('dragging');
+            document.body.classList.remove('resizing');
+            writeSetting(`git-graph.column-${column}`, String(columnWidths[column]));
+        };
+        resizer.addEventListener('pointermove', onMove);
+        resizer.addEventListener('pointerup', onEnd);
+        resizer.addEventListener('pointercancel', onEnd);
+    });
+
+    resizer.addEventListener('dblclick', () => {
+        setColumnWidth(column, columnDefaults[column]);
+        writeSetting(`git-graph.column-${column}`, null);
+    });
+}
 // Selects the commit selected last time, if it's in the graph.
 function restoreSelection() {
     const hash = readSetting(settingKeys.selectedCommit);
@@ -1044,6 +1153,7 @@ async function initialize() {
     await loadSettings();
     loadLayoutSettings();
     restoreControls();
+    loadColumnWidths();
     await loadGraph();
     restoreSelection();
     loadWorkingTree();

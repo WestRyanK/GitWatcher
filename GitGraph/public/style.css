@@ -610,6 +610,7 @@ body.resizing.resizing-rows {
     align-items: center;
     height: var(--row-height);
     padding-right: 12px;
+    overflow: hidden;
     white-space: nowrap;
     cursor: pointer;
 }
@@ -638,6 +639,117 @@ body.resizing.resizing-rows {
     font-size: 12px;
 }
 
+/* The columns after the graph: the description (branch labels and subject), author, date, and commit. Until the
+   description is resized, it fills the space and the commit column is narrow. Once it has a width, the columns after
+   it keep their widths and move along, and the commit column takes what's left. app.js sets the widths on the graph
+   pane, and an author or date column dragged to nothing is hidden. */
+.row .column {
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.row .col-description {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+}
+
+.fixed-description .row .col-description {
+    flex: none;
+    width: var(--col-description);
+}
+
+.row .col-author {
+    width: var(--col-author, 110px);
+}
+
+.row .col-date {
+    width: var(--col-date, 112px);
+}
+
+.row .col-hash {
+    width: 64px;
+}
+
+.fixed-description .row .col-hash {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+}
+
+.hide-author .row .col-author,
+.hide-date .row .col-date {
+    display: none;
+}
+
+/* The labels sit in the Commits title row, each placed over its column by app.js. */
+#graph-pane > .pane-header {
+    position: relative;
+    overflow: hidden;
+}
+
+.column-headers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.column-headers[hidden],
+.pane.collapsed .column-headers {
+    display: none;
+}
+
+.column-header {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.column-header > .column-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The edge in the gap before a label resizes the column to its left. */
+.column-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -8px;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.column-headers:hover .column-resizer::after,
+.column-resizer.dragging::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    bottom: 7px;
+    left: 3px;
+    width: 1px;
+    background: var(--border);
+}
+
+.column-resizer:hover::after,
+.column-resizer.dragging::after {
+    width: 2px;
+    background: var(--remote-fg);
+}
 .row .hash,
 .mono {
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -797,9 +909,4 @@ body.resizing.resizing-rows {
     color: var(--muted);
 }
 
-@media (max-width: 760px) {
 
-    .row .meta {
-        display: none;
-    }
-}

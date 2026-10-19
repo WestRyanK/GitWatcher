@@ -97,6 +97,11 @@ runtime, which comes with Windows 11. How it works:
   visible. An open pane's button is highlighted. Clicking **Status** opens only Status, and clicking **Branches** as
   well shows both, stacked. With both closed, only the rail is left. Clicking an open pane's title closes it too.
 * Drag any divider to resize the panes (arrow keys work too when a divider has focus, and double-click resets it).
+* The **Author**, **Date**, and **Commit** labels in the Commits title row line up with those columns. Drag the edge
+  before a label to resize the column to its left, like a table: the edge before **Author** resizes the subjects,
+  and the columns after it move along. Dragging the author or date column down to nothing hides it (drag its edge
+  back out to show it again). Double-click an edge to reset the column. Narrow windows start without the author and
+  date.
 * The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the
   **Remote** checkbox, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings` read and save
   them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so they
