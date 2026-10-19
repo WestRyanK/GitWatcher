@@ -335,13 +335,31 @@ body.resizing.resizing-rows {
     display: none;
 }
 
+/* The sidebar is the rail of pane buttons, which is always visible, and the open panes beside it. With both the
+   Branches and Status panes closed, only the rail is left. */
 .sidebar {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
     background: var(--bg-alt);
 }
 
-/* With both the Branches and Status panes closed, the sidebar shrinks to a rail of their vertical titles. With one of
-   them open, the closed one stays in the sidebar as just its title row. */
 .sidebar-rail {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 3px;
+    border-right: 1px solid var(--border);
+}
+
+.sidebar-panes {
+    flex: 1;
+}
+
+/* A closed pane disappears; its rail button opens it again. */
+.sidebar-panes > .pane.collapsed,
+.sidebar.collapsed > .sidebar-panes {
     display: none;
 }
 
@@ -349,26 +367,14 @@ body.resizing.resizing-rows {
     grid-template-columns: auto minmax(0, 1fr);
 }
 
-.workspace.sidebar-collapsed > #workspace-splitter,
-.sidebar.collapsed > .pane,
-.sidebar.collapsed > .splitter {
+.workspace.sidebar-collapsed > #workspace-splitter {
     display: none;
-}
-
-.sidebar.collapsed {
-    border-right: 1px solid var(--border);
-}
-
-.sidebar.collapsed > .sidebar-rail {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 6px 3px;
 }
 
 .sidebar-rail .rail-button {
     writing-mode: vertical-rl;
-    padding: 8px 3px;
+    padding: 10px 3px;
+    border-radius: 4px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -376,9 +382,12 @@ body.resizing.resizing-rows {
     color: var(--muted);
 }
 
-
-
-
+/* An open pane's button is highlighted, with a bar on the side next to the panes. */
+.sidebar-rail .rail-button[aria-expanded="true"] {
+    color: var(--fg);
+    background: var(--bg-hover);
+    box-shadow: inset -2px 0 0 var(--remote-fg);
+}
 .pane {
     display: flex;
     flex-direction: column;

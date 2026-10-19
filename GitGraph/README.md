@@ -93,10 +93,10 @@ runtime, which comes with Windows 11. How it works:
 * The commit filter, **Commits from**, **Show**, and **Live** are in the **Options** menu (the sliders icon at the
   top right), which keeps the toolbar to one line.
 * The commit details are below the graph. Click a pane's title to collapse it to its title row or open it again.
-  **Branches** and **Status** open and close separately: with one open, the other is just its title row, and with
-  both closed, the sidebar shrinks to a narrow rail. Clicking **Status** on the rail opens only Status, and the same
-  for Branches. Drag any divider to resize the panes (arrow keys work too when a divider has focus, and double-click
-  resets it).
+* **Branches** and **Status** open and close separately from the buttons on the sidebar's rail, which is always
+  visible. An open pane's button is highlighted. Clicking **Status** opens only Status, and clicking **Branches** as
+  well shows both, stacked. With both closed, only the rail is left. Clicking an open pane's title closes it too.
+* Drag any divider to resize the panes (arrow keys work too when a divider has focus, and double-click resets it).
 * The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the
   **Remote** checkbox, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings` read and save
   them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so they

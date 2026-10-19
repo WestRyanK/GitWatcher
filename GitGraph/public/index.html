@@ -62,44 +62,43 @@
         </div>
     </header>
     <main id="workspace" class="workspace">
-        <aside id="sidebar" class="sidebar stack">
-            <nav id="sidebar-rail" class="sidebar-rail" aria-label="Collapsed panes">
+        <aside id="sidebar" class="sidebar">
+            <!-- Always visible. Each button opens or closes its pane, and shows whether it's open. -->
+            <nav id="sidebar-rail" class="sidebar-rail" aria-label="Sidebar panes">
                 <button id="rail-branches" class="pane-toggle rail-button" type="button" aria-expanded="false"
-                    aria-controls="branches-pane" title="Expand">
-                    <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
-                </button>
+                    aria-controls="branches-pane">Branches</button>
                 <button id="rail-working-tree" class="pane-toggle rail-button" type="button" aria-expanded="false"
-                    aria-controls="working-tree-pane" title="Expand">
-                    <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
-                </button>
+                    aria-controls="working-tree-pane">Status</button>
             </nav>
-            <section id="branches-pane" class="pane sized-pane" aria-labelledby="branches-heading">
-                <header class="pane-header">
-                    <h2 id="branches-heading">
-                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="branches-pane">
-                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
-                        </button>
-                    </h2>
-                    <span id="branches-count" class="muted"></span>
-                    <label class="pane-option"><input id="show-remote-branches" type="checkbox"> Remote</label>
-                </header>
-                <input id="branch-filter" class="pane-filter" type="search" placeholder="Filter branches"
-                    aria-label="Filter branches">
-                <div id="branches" class="pane-body"></div>
-            </section>
-            <div id="sidebar-splitter" class="splitter" role="separator" tabindex="0" aria-controls="branches-pane"
-                aria-label="Resize the branches and status panes" title="Drag to resize. Double-click to reset."></div>
-            <section id="working-tree-pane" class="pane" aria-labelledby="working-tree-heading">
-                <header class="pane-header">
-                    <h2 id="working-tree-heading">
-                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="working-tree-pane">
-                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
-                        </button>
-                    </h2>
-                    <span id="working-tree-count" class="muted"></span>
-                </header>
-                <div id="working-tree" class="pane-body"></div>
-            </section>
+            <div id="sidebar-panes" class="sidebar-panes stack">
+                <section id="branches-pane" class="pane sized-pane" aria-labelledby="branches-heading">
+                    <header class="pane-header">
+                        <h2 id="branches-heading">
+                            <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="branches-pane">
+                                <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
+                            </button>
+                        </h2>
+                        <span id="branches-count" class="muted"></span>
+                        <label class="pane-option"><input id="show-remote-branches" type="checkbox"> Remote</label>
+                    </header>
+                    <input id="branch-filter" class="pane-filter" type="search" placeholder="Filter branches"
+                        aria-label="Filter branches">
+                    <div id="branches" class="pane-body"></div>
+                </section>
+                <div id="sidebar-splitter" class="splitter" role="separator" tabindex="0" aria-controls="branches-pane"
+                    aria-label="Resize the branches and status panes" title="Drag to resize. Double-click to reset."></div>
+                <section id="working-tree-pane" class="pane" aria-labelledby="working-tree-heading">
+                    <header class="pane-header">
+                        <h2 id="working-tree-heading">
+                            <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="working-tree-pane">
+                                <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
+                            </button>
+                        </h2>
+                        <span id="working-tree-count" class="muted"></span>
+                    </header>
+                    <div id="working-tree" class="pane-body"></div>
+                </section>
+            </div>
         </aside>
         <div id="workspace-splitter" class="splitter" role="separator" tabindex="0" aria-controls="sidebar"
             aria-label="Resize the sidebar" title="Drag to resize. Double-click to reset."></div>

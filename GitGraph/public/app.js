@@ -19,6 +19,7 @@ const elements = {
     workspace: document.getElementById('workspace'),
     workspaceSplitter: document.getElementById('workspace-splitter'),
     sidebar: document.getElementById('sidebar'),
+    sidebarPanes: document.getElementById('sidebar-panes'),
     sidebarSplitter: document.getElementById('sidebar-splitter'),
     layout: document.getElementById('layout'),
     splitter: document.getElementById('splitter'),
@@ -585,7 +586,7 @@ const splitters = [
     },
     {
         element: elements.sidebarSplitter,
-        container: elements.sidebar,
+        container: elements.sidebarPanes,
         pane: elements.branchesPane,
         paneIsBefore: true,
         horizontal: true,
@@ -683,11 +684,11 @@ function isPaneOpen(pane) {
 }
 
 // A stack drops its splitter and lets the open pane fill the space when either pane is collapsed. The Branches and
-// Status panes open and close separately; only when both are closed does the sidebar shrink to its rail.
+// Status panes open and close separately from the sidebar's rail; with both closed, only the rail is left.
 function updateStacks() {
     const sidebarPanes = [elements.branchesPane, elements.workingTreePane];
     elements.sidebar.classList.toggle('collapsed', sidebarPanes.every((pane) => pane.classList.contains('collapsed')));
-    for (const stack of [elements.sidebar, elements.layout]) {
+    for (const stack of [elements.sidebarPanes, elements.layout]) {
         const panes = [...stack.querySelectorAll(':scope > .pane')];
         stack.classList.toggle('has-closed-pane', panes.some((pane) => pane.classList.contains('collapsed')));
     }
