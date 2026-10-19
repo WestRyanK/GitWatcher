@@ -94,7 +94,8 @@ runtime, which comes with Windows 11. How it works:
   `git status` from writing its refreshed index.
 * The commit filter, **Commits from**, **Show**, and **Live** are in the **Options** menu (the sliders icon at the
   top right), which keeps the toolbar to one line.
-* The commit details are below the graph. Click a pane's title to collapse it to its title row or open it again.
+* The commit details are below the graph. Double-click a commit to open them if they're collapsed. Click a pane's
+  title to collapse it to its title row or open it again.
 * **Branches** and **Status** open and close separately from the buttons on the sidebar's rail, which is always
   visible. An open pane's button is highlighted. Clicking **Status** opens only Status, and clicking **Branches** as
   well shows both, stacked. With both closed, only the rail is left. Clicking an open pane's title closes it too.

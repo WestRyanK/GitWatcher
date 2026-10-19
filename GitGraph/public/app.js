@@ -1108,6 +1108,19 @@ elements.graph.addEventListener('click', (event) => {
         selectCommit(row.dataset.hash, false);
     }
 });
+
+// Double-clicking a commit also opens the Commit details pane if it's collapsed.
+elements.graph.addEventListener('dblclick', (event) => {
+    const row = event.target.closest('.row');
+    if (!row) {
+        return;
+    }
+    if (elements.detailsPane.classList.contains('collapsed')) {
+        setPaneCollapsed('details-pane', false);
+        writeSetting(`${settingKeys.collapsedPrefix}details-pane`, 'false');
+    }
+    selectCommit(row.dataset.hash, false);
+});
 elements.filter.addEventListener('input', applyFilter);
 elements.scope.addEventListener('change', loadGraph);
 elements.limit.addEventListener('change', loadGraph);
