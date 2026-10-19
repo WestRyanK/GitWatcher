@@ -29,13 +29,23 @@ From PowerShell in Windows Terminal (or a classic console window), run:
 .\GitGraph\Show-GitGraph.ps1
 ```
 
-This opens the viewer in a panel docked to the right side of that terminal window, below its tabs. When the tab
-row is hidden (quake mode, focus mode, or full screen), the panel reaches the top of the window. The panel
-follows the window when you move or resize it, hides when you minimize it, and closes when you close the window
-or exit the shell. Drag the panel's left edge to change its width (double-click the edge to reset it). The panel's
-minimize button shrinks it to a small button in the terminal's top-right corner. Click that button to open the panel
-again. The viewer keeps running while it's minimized, so it reopens instantly. The width and the minimized state are
-saved in `~/.git-graph/overlay.json`. To open the panel by typing `gg`, add an alias to your PowerShell profile:
+In Windows Terminal, this splits the current tab: a new pane on the right reserves room for the viewer, and the
+panel sits exactly over that pane. Your shell's pane gets narrower, so its text wraps before the panel instead of
+going under it. The panel follows the window when you move or resize it, hides when you minimize the window or
+switch to another tab, and closes (with its pane) when you close the window or exit the shell. It works with the tab
+row hidden too (quake mode, focus mode, or full screen).
+
+* **Width:** resize the pane with Windows Terminal's pane resizing (Alt+Shift+arrow keys by default). The panel
+  follows it, and the next pane opens at the same width.
+* **Minimize:** the panel's minimize button closes the pane, so your shell gets its full width back, and leaves a
+  small button in the terminal's top-right corner. Click it to split the pane again and reopen the panel. Closing the
+  pane yourself does the same as minimizing. The viewer keeps running while it's minimized, so it reopens instantly.
+* The width and the minimized state are saved in `~/.git-graph/overlay.json`.
+
+In a classic console window, which has no panes, the panel covers the right side of the window instead, below any
+title bar. Drag its left edge to change the width (double-click the edge to reset it).
+
+To open the panel by typing `gg`, add an alias to your PowerShell profile:
 
 ```powershell
 Set-Alias gg D:\source\GitHub\GitWatcher\GitGraph\Show-GitGraph.ps1
@@ -43,16 +53,22 @@ Set-Alias gg D:\source\GitHub\GitWatcher\GitGraph\Show-GitGraph.ps1
 
 The panel is `GitGraph.Overlay`, a small WPF app. `Show-GitGraph.ps1` builds it on first use, and again whenever
 its sources change. An open panel locks the program, so after an update the script starts the current version and
-asks you to close every panel. The next run then rebuilds it. It needs the .NET 10 SDK, Node.js, and the WebView2 runtime, which comes with Windows 11. How
-it works:
+asks you to close every panel. The next run then rebuilds it. It needs the .NET 10 SDK, Node.js, and the WebView2
+runtime, which comes with Windows 11. How it works:
 
 * It finds the terminal window through the console of the shell that started it: Windows Terminal owns that
   console's hidden window. `--terminal-window <hwnd>` picks a window directly.
+* It reserves room with `wt --window 0 split-pane --vertical`, which splits the active tab of the most recently used
+  Windows Terminal window, the one you just typed in. Before splitting again on restore, it brings that window to the
+  front. The new pane gets a unique title and runs a small Windows PowerShell loop that waits on a named event. The
+  panel signals the event to close the pane, and the loop also ends if the panel's process is gone. If the pane
+  doesn't appear in the terminal window within 10 seconds, the panel closes it and covers the window instead.
 * The panel is an owned window of the terminal window, so it stays just above the terminal (not above every
-  window) and hides with it. A `SetWinEventHook` location-change hook keeps it docked. Nothing is injected into
-  Windows Terminal, and Windows Terminal's own window isn't changed.
-* It finds the top of the terminal panes through UI Automation (Windows Terminal's `TermControl` elements), instead
-  of assuming a tab row, and checks again every half second in case the tab row was shown or hidden.
+  window) and hides with it. A `SetWinEventHook` location-change hook keeps it in place while the window moves.
+  Nothing is injected into Windows Terminal.
+* Every half second it asks UI Automation where Windows Terminal's panes (`TermControl` elements) are. That gives the
+  placeholder pane's exact bounds (and its width for next time), shows whether its tab is active (only the active
+  tab's panes are reported), and gives the top of the panes for the minimized button and the classic overlay.
 * It starts its own `server.js` on a free port for the shell's current folder, shows it with WebView2, and stops the
   server when it closes. The server also exits on its own if the panel's process goes away. The page settings are
   shared with the browser view.

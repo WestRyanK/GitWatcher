@@ -65,8 +65,9 @@
 
     <Grid>
         <Grid x:Name="ExpandedPanel"
-              ColumnDefinitions="6, *">
+              ColumnDefinitions="Auto, *">
             <Border x:Name="ResizeGrip"
+                    Width="6"
                     Background="{DynamicResource OverlayHeaderBackground}"
                     BorderBrush="{DynamicResource OverlayBorder}"
                     BorderThickness="1,0,0,0"

@@ -4,8 +4,10 @@
 
 .DESCRIPTION
     Starts GitGraph.Overlay, a small WPF app that shows the git graph viewer (GitGraph) for a repository in
-    a panel docked to the right side of the terminal window you run this from. The panel follows the window when
-    you move or resize it, hides when you minimize it, and closes when you close the window or this shell.
+    a panel docked to the right side of the terminal window you run this from. In Windows Terminal it splits the
+    current tab and covers the new pane, so your shell's text wraps before the panel. The panel follows the window
+    when you move or resize it, hides when you minimize it or switch tabs, and closes when you close the window or
+    this shell.
 
     The first run builds the app (it needs the .NET 10 SDK), and so does any run after its sources change. The
     viewer also needs Node.js on PATH and the WebView2 runtime, which comes with Windows 11.

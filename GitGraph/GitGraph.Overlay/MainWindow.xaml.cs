@@ -1,5 +1,4 @@
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -12,6 +11,11 @@ namespace GitGraph.Overlay;
 /// <summary>
 /// A borderless window, owned by the terminal window, that stays docked to the terminal's right side.
 /// </summary>
+/// <remarks>
+/// In Windows Terminal, the overlay splits off a <see cref="PlaceholderPane"/> and covers it exactly, so the shell's
+/// pane gets narrower and no text goes under the overlay. A classic console window has no panes, and Windows Terminal
+/// might not split, so in those cases the overlay covers the right side of the window instead.
+/// </remarks>
 public partial class MainWindow : Window
 {
     // Sizes in device-independent pixels; they're scaled by the terminal's DPI.
@@ -23,27 +27,40 @@ public partial class MainWindow : Window
     private const double CollapsedButtonRightMargin = 24;
     private const double CollapsedButtonTopMargin = 8;
 
-    // How often to check whether the terminal's tab row appeared or disappeared, for example when focus mode is
-    // turned on or off. Moving or resizing the window doesn't change it, so this doesn't need to be frequent.
-    private static readonly TimeSpan TopInsetRefreshInterval = TimeSpan.FromSeconds(0.5);
+    // How often to measure the terminal's panes through UI Automation. That catches what moving the window doesn't
+    // report: the tab row being shown or hidden, the placeholder pane being resized, and tab switches.
+    private static readonly TimeSpan LayoutRefreshInterval = TimeSpan.FromSeconds(0.5);
+
+    // How long to wait for a new placeholder pane to appear before covering the window instead.
+    private static readonly TimeSpan PlaceholderTimeout = TimeSpan.FromSeconds(10);
 
     private readonly TerminalWindow _terminal;
     private readonly OverlaySettings _settings;
+    private readonly DispatcherTimer _layoutTimer;
     private TerminalWindowTracker? _tracker;
-    private readonly DispatcherTimer _topInsetTimer;
     private int? _measuredTopInset;
-    private bool _measuringTopInset;
+    private bool _measuringLayout;
     private nint _handle;
+    private PixelRect? _lastPosition;
     private NativeMethods.Point _dragStart;
     private int _dragStartWidth;
+
+    private PlaceholderPane? _placeholder;
+    private PaneOffsets? _placeholderOffsets;
+    private bool _placeholderSeen;
+    private bool _placeholderUnavailable;
+
+    // Hidden while the placeholder pane's tab isn't the active tab.
+    private bool _hiddenWithTab;
 
     internal MainWindow(TerminalWindow terminal, OverlaySettings settings)
     {
         _terminal = terminal;
         _settings = settings;
+        _placeholderUnavailable = !terminal.IsWindowsTerminal;
         InitializeComponent();
-        _topInsetTimer = new DispatcherTimer { Interval = TopInsetRefreshInterval };
-        _topInsetTimer.Tick += OnTopInsetTimerTick;
+        _layoutTimer = new DispatcherTimer { Interval = LayoutRefreshInterval };
+        _layoutTimer.Tick += OnLayoutTimerTick;
         SourceInitialized += OnSourceInitialized;
         DpiChanged += OnDpiChanged;
         Closed += OnClosed;
@@ -87,32 +104,70 @@ public partial class MainWindow : Window
         _tracker.Closed += (_, _) => Close();
 
         // Measure once before the first layout, so the overlay doesn't start in the wrong place and jump.
-        _measuredTopInset = _terminal.MeasureTopInset();
-        _topInsetTimer.Start();
+        _measuredTopInset = _terminal.MeasureLayout(null).TopInset;
+        _layoutTimer.Start();
         SetCollapsed(_settings.Collapsed);
     }
 
-    private async void OnTopInsetTimerTick(object? sender, EventArgs e)
+    private async void OnLayoutTimerTick(object? sender, EventArgs e)
     {
-        if (_measuringTopInset || _terminal.IsMinimized)
+        if (_measuringLayout || _terminal.IsMinimized)
         {
             return;
         }
 
-        _measuringTopInset = true;
+        _measuringLayout = true;
         try
         {
-            int? topInset = await Task.Run(_terminal.MeasureTopInset);
-            if (topInset is not null && topInset != _measuredTopInset)
-            {
-                _measuredTopInset = topInset;
-                Reposition();
-            }
+            string? placeholderTitle = _placeholder?.Title;
+            TerminalLayout layout = await Task.Run(() => _terminal.MeasureLayout(placeholderTitle));
+            ApplyLayout(layout);
         }
         finally
         {
-            _measuringTopInset = false;
+            _measuringLayout = false;
         }
+    }
+
+    private void ApplyLayout(TerminalLayout layout)
+    {
+        if (layout.TopInset is not null)
+        {
+            _measuredTopInset = layout.TopInset;
+        }
+
+        if (_placeholder is not null && !_settings.Collapsed)
+        {
+            if (layout.Pane is PixelRect pane && _terminal.TryGetBounds(out PixelRect terminalBounds))
+            {
+                _placeholderSeen = true;
+                _placeholderOffsets = PaneOffsets.Measure(terminalBounds, pane);
+                RememberWidth(terminalBounds, pane);
+                ShowOverlay();
+            }
+            else if (_placeholderSeen && !_placeholder.IsOpen)
+            {
+                // The user closed the placeholder pane. Treat it like minimizing, so the shell keeps its width.
+                Collapse();
+                return;
+            }
+            else if (!_placeholderSeen && DateTime.UtcNow - _placeholder.SplitAt > PlaceholderTimeout)
+            {
+                // The pane never showed up in this window, for example because the split went to another Windows
+                // Terminal window. Close it and cover this window instead.
+                ClosePlaceholder();
+                _placeholderUnavailable = true;
+                ResizeGrip.Visibility = Visibility.Visible;
+                ShowOverlay();
+            }
+            else if (_placeholderSeen)
+            {
+                // The pane's tab isn't the active tab. Only the active tab's panes are reported.
+                HideOverlay();
+            }
+        }
+
+        Reposition();
     }
 
     private void OnViewerInitializationCompleted(object? sender, CoreWebView2InitializationCompletedEventArgs e)
@@ -123,8 +178,8 @@ public partial class MainWindow : Window
         }
     }
 
-    // Minimized, the overlay shrinks to a small button in the terminal's top-right corner. The server and page keep
-    // running, so restoring is instant.
+    // Minimized, the overlay shrinks to a small button in the terminal's top-right corner, and the placeholder pane
+    // closes so the shell gets its full width back. The server and page keep running, so restoring is instant.
     private void SetCollapsed(bool collapsed)
     {
         ExpandedPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
@@ -133,53 +188,149 @@ public partial class MainWindow : Window
         // Windows 11 rounds the button's corners. The docked panel stays square so it sits flush with the terminal.
         int corners = collapsed ? NativeMethods.DwmCornerRoundSmall : NativeMethods.DwmCornerDoNotRound;
         NativeMethods.DwmSetWindowAttribute(_handle, NativeMethods.DwmWindowCornerPreference, ref corners, sizeof(int));
+
+        if (collapsed)
+        {
+            ClosePlaceholder();
+        }
+        else
+        {
+            OpenPlaceholder();
+        }
+
+        ShowOverlay();
         Reposition();
+    }
+
+    private void Collapse()
+    {
+        _settings.Collapsed = true;
+        _settings.Save();
+        SetCollapsed(true);
+    }
+
+    private void OpenPlaceholder()
+    {
+        if (_placeholder is null && !_placeholderUnavailable)
+        {
+            // "wt --window 0" splits the most recently used Windows Terminal window, so make sure it's this one.
+            NativeMethods.SetForegroundWindow(_terminal.Handle);
+            _placeholder = PlaceholderPane.Split(_settings.WidthFraction);
+            _placeholderSeen = false;
+            _placeholderOffsets = null;
+            _placeholderUnavailable = _placeholder is null;
+        }
+
+        // Windows Terminal resizes the pane; the grip is only for covering the window.
+        ResizeGrip.Visibility = _placeholderUnavailable ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ClosePlaceholder()
+    {
+        _placeholder?.Dispose();
+        _placeholder = null;
+        _placeholderOffsets = null;
+        _placeholderSeen = false;
+    }
+
+    // Keeps the width the user gave the placeholder pane (with Windows Terminal's pane resizing) for next time.
+    private void RememberWidth(PixelRect terminalBounds, PixelRect pane)
+    {
+        if (terminalBounds.Width <= 0)
+        {
+            return;
+        }
+
+        double widthFraction = pane.Width / (double)terminalBounds.Width;
+        if (Math.Abs(widthFraction - _settings.WidthFraction) > 0.01)
+        {
+            _settings.WidthFraction = widthFraction;
+            _settings.Save();
+        }
+    }
+
+    private void ShowOverlay()
+    {
+        if (_hiddenWithTab)
+        {
+            _hiddenWithTab = false;
+            _lastPosition = null;
+            Show();
+        }
+    }
+
+    private void HideOverlay()
+    {
+        if (!_hiddenWithTab)
+        {
+            _hiddenWithTab = true;
+            Hide();
+        }
     }
 
     private void OnDpiChanged(object? sender, DpiChangedEventArgs e)
     {
         // WPF resizes the window for the new DPI after this event. Dock it again once that's done.
+        _lastPosition = null;
         Dispatcher.BeginInvoke(Reposition);
     }
 
     private void OnClosed(object? sender, EventArgs e)
     {
-        _topInsetTimer.Stop();
+        _layoutTimer.Stop();
         _tracker?.Dispose();
+        ClosePlaceholder();
         Viewer.Dispose();
     }
 
     // Works in physical pixels with SetWindowPos, so the overlay lines up exactly with the terminal on any monitor.
     private void Reposition()
     {
-        if (_handle == 0 || _terminal.IsMinimized || !_terminal.TryGetBounds(out PixelRect terminalBounds))
+        if (_handle == 0 || _hiddenWithTab || _terminal.IsMinimized || !_terminal.TryGetBounds(out PixelRect terminalBounds))
         {
             return;
         }
 
         double scale = _terminal.DpiScale;
         int topInset = _measuredTopInset ?? (int)Math.Round(_terminal.DefaultTopInset * scale);
-        PixelRect dock = _settings.Collapsed
-            ? DockLayout.CalculateButton(
+        PixelRect position;
+        if (_settings.Collapsed)
+        {
+            position = DockLayout.CalculateButton(
                 terminalBounds,
                 (int)Math.Round(CollapsedButtonSize * scale),
                 topInset,
                 (int)Math.Round(CollapsedButtonRightMargin * scale),
-                (int)Math.Round(CollapsedButtonTopMargin * scale))
-            : DockLayout.Calculate(
+                (int)Math.Round(CollapsedButtonTopMargin * scale));
+        }
+        else if (_placeholderOffsets is PaneOffsets offsets)
+        {
+            position = offsets.Apply(terminalBounds);
+        }
+        else
+        {
+            // Covering the window, or waiting for a new placeholder pane, which appears about here.
+            position = DockLayout.Calculate(
                 terminalBounds,
                 _settings.WidthFraction,
                 topInset,
                 (int)Math.Round(MinimumOverlayWidth * scale),
                 (int)Math.Round(MinimumTerminalWidth * scale));
+        }
 
+        if (position == _lastPosition)
+        {
+            return;
+        }
+
+        _lastPosition = position;
         NativeMethods.SetWindowPos(
             _handle,
             0,
-            dock.Left,
-            dock.Top,
-            dock.Width,
-            dock.Height,
+            position.Left,
+            position.Top,
+            position.Width,
+            position.Height,
             NativeMethods.SetWindowPosNoZOrder | NativeMethods.SetWindowPosNoActivate);
     }
 
@@ -225,9 +376,7 @@ public partial class MainWindow : Window
 
     private void OnMinimizeClick(object sender, RoutedEventArgs e)
     {
-        _settings.Collapsed = true;
-        _settings.Save();
-        SetCollapsed(true);
+        Collapse();
     }
 
     private void OnRestoreClick(object sender, RoutedEventArgs e)

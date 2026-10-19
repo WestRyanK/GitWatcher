@@ -29,7 +29,7 @@ internal sealed class TerminalWindow
 
     /// <summary>
     /// The height, in device-independent pixels, to leave uncovered at the top of the window when
-    /// <see cref="MeasureTopInset"/> can't tell.
+    /// <see cref="MeasureLayout"/> can't tell.
     /// </summary>
     public double DefaultTopInset => IsWindowsTerminal ? WindowsTerminalTabRowHeight : 0;
 
@@ -59,25 +59,27 @@ internal sealed class TerminalWindow
     }
 
     /// <summary>
-    /// Measures how far below the top of the client area the terminal panes start, in physical pixels, so the
-    /// overlay covers the panes but not Windows Terminal's tab row. Returns null when it can't be measured.
+    /// Measures the visible terminal panes through UI Automation: how far below the top of the client area they
+    /// start, and where the pane with the given title is.
     /// </summary>
     /// <remarks>
     /// Windows Terminal draws its tab row and title bar inside the client area, and hides them in quake mode, in
     /// focus mode, and in full screen. Instead of guessing which mode it's in, this asks UI Automation where the
-    /// terminal panes are. This is a cross-process call, so call it off the UI thread when it isn't a one-off.
+    /// terminal panes are. Only the active tab's panes are in the tree, so a pane in another tab isn't found.
+    /// This is a cross-process call, so call it off the UI thread when it isn't a one-off.
     /// </remarks>
-    public int? MeasureTopInset()
+    /// <param name="paneTitle">The title of a pane to find, or null.</param>
+    public TerminalLayout MeasureLayout(string? paneTitle)
     {
         if (!IsWindowsTerminal)
         {
-            // A classic console window's client area is all console.
-            return 0;
+            // A classic console window's client area is all console, and it has no panes.
+            return new TerminalLayout(0, null);
         }
 
         if (!TryGetBounds(out PixelRect bounds))
         {
-            return null;
+            return new TerminalLayout(null, null);
         }
 
         try
@@ -85,21 +87,33 @@ internal sealed class TerminalWindow
             AutomationElement window = AutomationElement.FromHandle(Handle);
             PropertyCondition isPane = new(AutomationElement.ClassNameProperty, TerminalPaneClassName);
             double? panesTop = null;
+            PixelRect? titledPane = null;
             foreach (AutomationElement pane in window.FindAll(TreeScope.Descendants, isPane))
             {
                 Rect paneBounds = pane.Current.BoundingRectangle;
-                if (!paneBounds.IsEmpty && !pane.Current.IsOffscreen)
+                if (paneBounds.IsEmpty || pane.Current.IsOffscreen)
                 {
-                    panesTop = panesTop is null ? paneBounds.Top : Math.Min(panesTop.Value, paneBounds.Top);
+                    continue;
+                }
+
+                panesTop = panesTop is null ? paneBounds.Top : Math.Min(panesTop.Value, paneBounds.Top);
+                if (paneTitle is not null && pane.Current.Name == paneTitle)
+                {
+                    titledPane = new PixelRect(
+                        (int)Math.Round(paneBounds.Left),
+                        (int)Math.Round(paneBounds.Top),
+                        (int)Math.Round(paneBounds.Right),
+                        (int)Math.Round(paneBounds.Bottom));
                 }
             }
 
-            return panesTop is null ? null : Math.Max(0, (int)Math.Round(panesTop.Value) - bounds.Top);
+            int? topInset = panesTop is null ? null : Math.Max(0, (int)Math.Round(panesTop.Value) - bounds.Top);
+            return new TerminalLayout(topInset, titledPane);
         }
         catch (Exception exception) when (exception is ElementNotAvailableException or COMException or InvalidOperationException)
         {
             // The window closed or its UI changed while being measured.
-            return null;
+            return new TerminalLayout(null, null);
         }
     }
 
