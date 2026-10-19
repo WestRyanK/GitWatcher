@@ -53,6 +53,8 @@ public partial class MainWindow : Window
     // Hidden while the placeholder pane's tab isn't the active tab.
     private bool _hiddenWithTab;
 
+    private Uri? _viewerAddress;
+
     internal MainWindow(TerminalWindow terminal, OverlaySettings settings)
     {
         _terminal = terminal;
@@ -70,7 +72,9 @@ public partial class MainWindow : Window
     {
         // WebView2 is a hosted native window, so nothing can draw over it. It initializes once it's on screen, which
         // is later if the overlay starts minimized.
+        _viewerAddress = address;
         MessageText.Visibility = Visibility.Collapsed;
+        Header.Visibility = Visibility.Collapsed;
         Viewer.Visibility = Visibility.Visible;
         Viewer.CreationProperties = new CoreWebView2CreationProperties
         {
@@ -80,11 +84,14 @@ public partial class MainWindow : Window
                 "WebView2"),
         };
         Viewer.CoreWebView2InitializationCompleted += OnViewerInitializationCompleted;
+        Viewer.WebMessageReceived += OnViewerWebMessageReceived;
         Viewer.Source = address;
     }
 
     internal void ShowMessage(string message)
     {
+        // Without the page, the overlay's own header provides the minimize and close buttons.
+        Header.Visibility = Visibility.Visible;
         Viewer.Visibility = Visibility.Collapsed;
         MessageText.Text = message;
         MessageText.Visibility = Visibility.Visible;
@@ -168,6 +175,28 @@ public partial class MainWindow : Window
         }
 
         Reposition();
+    }
+
+    // The page's toolbar has the overlay's minimize and close buttons, so the overlay needs no header row of its own.
+    // It sends "minimize" or "close" with window.chrome.webview.postMessage. Messages from any other page are ignored.
+    private void OnViewerWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        if (_viewerAddress is null
+            || !Uri.TryCreate(e.Source, UriKind.Absolute, out Uri? source)
+            || Uri.Compare(source, _viewerAddress, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) != 0)
+        {
+            return;
+        }
+
+        string? command = e.TryGetWebMessageAsString();
+        if (command == "minimize")
+        {
+            Collapse();
+        }
+        else if (command == "close")
+        {
+            Close();
+        }
     }
 
     private void OnViewerInitializationCompleted(object? sender, CoreWebView2InitializationCompletedEventArgs e)

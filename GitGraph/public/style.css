@@ -139,6 +139,44 @@ body {
 }
 
 
+.host-controls {
+    display: flex;
+    flex: none;
+    margin-right: -6px;
+}
+
+.host-controls[hidden] {
+    display: none;
+}
+
+.host-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.host-button:hover,
+.host-button:focus-visible {
+    background: var(--bg-hover);
+    color: var(--fg);
+    outline: none;
+}
+
+.host-button svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
 .options {
     position: absolute;
     top: calc(100% + 4px);

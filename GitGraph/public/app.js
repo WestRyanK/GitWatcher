@@ -979,6 +979,14 @@ for (const control of rememberedControls) {
     });
 }
 
+// Inside the Windows Terminal overlay, the page is hosted by WebView2, and the overlay's minimize and close buttons
+// live in this toolbar to keep everything on one line. They ask the overlay to act through WebView2's messages.
+const webViewHost = window.chrome?.webview;
+if (webViewHost) {
+    document.getElementById('host-controls').hidden = false;
+    document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
+    document.getElementById('host-close').addEventListener('click', () => webViewHost.postMessage('close'));
+}
 
 // The Options menu holds the commit filter and the graph settings.
 function setOptionsOpen(open) {
