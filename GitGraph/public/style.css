@@ -339,7 +339,8 @@ body.resizing.resizing-rows {
     background: var(--bg-alt);
 }
 
-/* The Branches and Status panes collapse sideways: the sidebar shrinks to a rail of vertical titles. */
+/* With both the Branches and Status panes closed, the sidebar shrinks to a rail of their vertical titles. With one of
+   them open, the closed one stays in the sidebar as just its title row. */
 .sidebar-rail {
     display: none;
 }
@@ -376,14 +377,6 @@ body.resizing.resizing-rows {
 }
 
 
-/* In the sidebar, the chevron points the way the panes collapse: left when open, right in the rail. */
-.sidebar .pane-toggle .chevron {
-    transform: rotate(90deg);
-}
-
-.sidebar .rail-button .chevron {
-    transform: rotate(-90deg);
-}
 
 
 .pane {

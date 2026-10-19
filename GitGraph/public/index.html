@@ -64,19 +64,19 @@
     <main id="workspace" class="workspace">
         <aside id="sidebar" class="sidebar stack">
             <nav id="sidebar-rail" class="sidebar-rail" aria-label="Collapsed panes">
-                <button id="rail-branches" class="pane-toggle rail-button" type="button" aria-expanded="true"
-                    aria-controls="sidebar" title="Expand">
+                <button id="rail-branches" class="pane-toggle rail-button" type="button" aria-expanded="false"
+                    aria-controls="branches-pane" title="Expand">
                     <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
                 </button>
-                <button id="rail-working-tree" class="pane-toggle rail-button" type="button" aria-expanded="true"
-                    aria-controls="sidebar" title="Expand">
+                <button id="rail-working-tree" class="pane-toggle rail-button" type="button" aria-expanded="false"
+                    aria-controls="working-tree-pane" title="Expand">
                     <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
                 </button>
             </nav>
             <section id="branches-pane" class="pane sized-pane" aria-labelledby="branches-heading">
                 <header class="pane-header">
                     <h2 id="branches-heading">
-                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="sidebar">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="branches-pane">
                             <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
                         </button>
                     </h2>
@@ -92,7 +92,7 @@
             <section id="working-tree-pane" class="pane" aria-labelledby="working-tree-heading">
                 <header class="pane-header">
                     <h2 id="working-tree-heading">
-                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="sidebar">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="working-tree-pane">
                             <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
                         </button>
                     </h2>

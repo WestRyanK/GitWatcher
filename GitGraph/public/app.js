@@ -678,13 +678,15 @@ function attachSplitter(splitter) {
     });
 }
 
-// A pane in the sidebar is also closed while the whole sidebar is collapsed to its rail.
 function isPaneOpen(pane) {
-    return !pane.classList.contains('collapsed') && !pane.closest('.sidebar.collapsed');
+    return !pane.classList.contains('collapsed');
 }
 
-// A stack drops its splitter and lets the open pane fill the space when either pane is collapsed.
+// A stack drops its splitter and lets the open pane fill the space when either pane is collapsed. The Branches and
+// Status panes open and close separately; only when both are closed does the sidebar shrink to its rail.
 function updateStacks() {
+    const sidebarPanes = [elements.branchesPane, elements.workingTreePane];
+    elements.sidebar.classList.toggle('collapsed', sidebarPanes.every((pane) => pane.classList.contains('collapsed')));
     for (const stack of [elements.sidebar, elements.layout]) {
         const panes = [...stack.querySelectorAll(':scope > .pane')];
         stack.classList.toggle('has-closed-pane', panes.some((pane) => pane.classList.contains('collapsed')));
@@ -694,7 +696,7 @@ function updateStacks() {
 
 const paneToggles = [...document.querySelectorAll('.pane-toggle')];
 
-// Several toggles can control one element: Branches, Status, and the rail buttons all control the sidebar.
+// Several toggles can control one pane: a pane's title and its button on the sidebar rail.
 function setPaneCollapsed(paneId, collapsed) {
     document.getElementById(paneId).classList.toggle('collapsed', collapsed);
     for (const toggle of paneToggles) {
@@ -708,6 +710,18 @@ function setPaneCollapsed(paneId, collapsed) {
 
 function loadLayoutSettings() {
     elements.showRemoteBranches.checked = readBooleanSetting(settingKeys.showRemoteBranches, false);
+
+    // Earlier versions collapsed the Branches and Status panes together as the whole sidebar.
+    const legacySidebarKey = `${settingKeys.collapsedPrefix}sidebar`;
+    if (readSetting(legacySidebarKey) !== null) {
+        const sidebarCollapsed = readSetting(legacySidebarKey);
+        for (const paneId of ['branches-pane', 'working-tree-pane']) {
+            if (readSetting(settingKeys.collapsedPrefix + paneId) === null) {
+                writeSetting(settingKeys.collapsedPrefix + paneId, sidebarCollapsed);
+            }
+        }
+        writeSetting(legacySidebarKey, null);
+    }
 
     const paneIds = new Set(paneToggles.map((toggle) => toggle.getAttribute('aria-controls')));
     for (const paneId of paneIds) {
