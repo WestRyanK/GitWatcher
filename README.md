@@ -15,17 +15,30 @@ Windows Terminal.
 * For the Windows Terminal panel: **Windows Terminal**, the **.NET 10 SDK**, and the **WebView2 runtime**, which
   comes with Windows 11.
 
+## Install
+
+Clone the repository and install the `GitWatcher` PowerShell module:
+
+```powershell
+git clone https://github.com/WestRyanK/GitWatcher.git
+cd GitWatcher
+./Install.ps1
+```
+
+`Install.ps1` adds the module to `Documents\PowerShell\Modules`. The module points back at your clone, so pulling
+updates is enough; install again only if you move the clone.
+
 ## Running it
 
 ### Docked in Windows Terminal
 
-From PowerShell in Windows Terminal (or a classic console window), run:
+From PowerShell in Windows Terminal (or a classic console window), in any folder of a repository, run:
 
 ```powershell
-.\Show-GitWatcher.ps1
+Start-GitWatcher
 ```
 
-In Windows Terminal, this splits the current tab: a new pane on the right reserves room for the viewer, and the
+Pass `-Path` to show a different repository. In Windows Terminal, this splits the current tab: a new pane on the right reserves room for the viewer, and the
 panel sits exactly over that pane. Your shell's pane gets narrower, so its text wraps before the panel instead of
 going under it. The panel follows the window when you move or resize it, hides when you minimize the window or
 switch to another tab, and closes (with its pane) when you close the window or exit the shell. It works with the tab
@@ -41,10 +54,10 @@ row hidden too (quake mode, focus mode, or full screen).
 In a classic console window, which has no panes, the panel covers the right side of the window instead, below any
 title bar. Drag its left edge to change the width (double-click the edge to reset it).
 
-To open the panel by typing `gw`, add an alias to your PowerShell profile, using the path of your clone:
+To open the panel by typing `gw`, add an alias to your PowerShell profile:
 
 ```powershell
-Set-Alias gw D:\source\GitHub\GitWatcher\Show-GitWatcher.ps1
+Set-Alias gw Start-GitWatcher
 ```
 
 ### In a browser
@@ -122,7 +135,8 @@ Git Watcher never changes your repository. Its menus copy commands for you to ru
 
 * [`GitWatcher.Server`](GitWatcher.Server) holds the Node server (`server.js`) and the page it serves (`public/`).
 * [`GitWatcher.Overlay`](GitWatcher.Overlay) is the WPF app for the Windows Terminal panel.
-* [`Show-GitWatcher.ps1`](Show-GitWatcher.ps1) builds the panel when needed and starts it.
+* [`GitWatcher.psm1`](GitWatcher.psm1) is the PowerShell module with `Start-GitWatcher`, which builds the panel when
+  needed and starts it. [`Install.ps1`](Install.ps1) installs the module.
 
 ### The server and page
 
@@ -143,7 +157,7 @@ The page is plain HTML, JavaScript, and SVG in `GitWatcher.Server/public`.
 
 ### The Windows Terminal panel
 
-The panel is `GitWatcher.Overlay`, a small WPF app. `Show-GitWatcher.ps1` builds it on first use, and again
+The panel is `GitWatcher.Overlay`, a small WPF app. `Start-GitWatcher` builds it on first use, and again
 whenever its sources change. An open panel locks the program, so after an update the script starts the current
 version and asks you to close every panel. The next run then rebuilds it.
 
