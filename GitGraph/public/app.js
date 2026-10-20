@@ -41,6 +41,7 @@ const elements = {
     graphScroll: document.getElementById('graph-scroll'),
     graphPane: document.getElementById('graph-pane'),
     columnHeaders: document.getElementById('column-headers'),
+    columnToggles: [...document.querySelectorAll('.column-toggle')],
     graph: document.getElementById('graph'),
     details: document.getElementById('details'),
 };
@@ -1147,7 +1148,7 @@ function closeContextMenu() {
     contextMenu.target = null;
 }
 
-// Items are { label, action } objects, or 'separator'.
+// Items are { label, action } objects, with `checked` for an item that can be on or off, or 'separator'.
 function openContextMenu(event, target, items) {
     event.preventDefault();
     closeContextMenu();
@@ -1161,9 +1162,17 @@ function openContextMenu(event, target, items) {
             contextMenu.element.appendChild(separator);
             continue;
         }
-        const button = createElement('button', 'context-menu-item', item.label);
+        const button = createElement('button', 'context-menu-item');
         button.type = 'button';
-        button.setAttribute('role', 'menuitem');
+        if (item.checked === undefined) {
+            button.setAttribute('role', 'menuitem');
+        } else {
+            // A checkable item shows a check mark when it's on.
+            button.setAttribute('role', 'menuitemcheckbox');
+            button.setAttribute('aria-checked', String(item.checked));
+            button.appendChild(createElement('span', 'context-menu-check', item.checked ? '✓' : ''));
+        }
+        button.appendChild(document.createTextNode(item.label));
         button.addEventListener('click', () => {
             closeContextMenu();
             item.action();
@@ -1357,6 +1366,10 @@ const descriptionMinimumWidth = 60;
 const columnMaximumWidth = 2000;
 const columnWidths = {};
 
+// The width each column had when it was last shown, so a hidden column comes back at that width.
+const columnRestoreWidths = {};
+const columnLabels = { author: 'Author', date: 'Date', hash: 'Commit' };
+
 // Which column each label's edge resizes: the one to its left.
 const resizedByEdgeOf = { author: 'description', date: 'author', hash: 'date' };
 
@@ -1364,9 +1377,28 @@ function setColumnWidth(column, width) {
     const clamped = Math.min(Math.max(Math.round(width), 0), columnMaximumWidth);
     const visibleWidth = clamped < columnMinimumWidth ? 0 : clamped;
     columnWidths[column] = visibleWidth;
+    if (visibleWidth > 0) {
+        columnRestoreWidths[column] = visibleWidth;
+    }
     elements.graphPane.style.setProperty(`--col-${column}`, `${visibleWidth}px`);
     elements.graphPane.classList.toggle(`hide-${column}`, visibleWidth === 0);
+    for (const checkbox of elements.columnToggles) {
+        if (checkbox.dataset.column === column) {
+            checkbox.checked = visibleWidth > 0;
+        }
+    }
     alignColumnHeaders();
+}
+
+function saveColumnWidth(column) {
+    writeSetting(`git-graph.column-${column}`, String(columnWidths[column]));
+    writeSetting(`git-graph.column-${column}-restore`, String(columnRestoreWidths[column] ?? columnDefaults[column]));
+}
+
+// Shows a hidden column at the width it had, or hides a column, giving its space to the subjects.
+function setColumnVisible(column, visible) {
+    setColumnWidth(column, visible ? (columnRestoreWidths[column] || columnDefaults[column]) : 0);
+    saveColumnWidth(column);
 }
 
 // Without saved widths, a narrow window (such as the Windows Terminal overlay) starts without the author and date.
@@ -1378,6 +1410,8 @@ function loadColumnWidths() {
 
     const narrow = window.innerWidth < 760;
     for (const column of Object.keys(columnDefaults)) {
+        const restore = Number.parseInt(readSetting(`git-graph.column-${column}-restore`) || '', 10);
+        columnRestoreWidths[column] = Number.isFinite(restore) && restore >= columnMinimumWidth ? restore : columnDefaults[column];
         const saved = Number.parseInt(readSetting(`git-graph.column-${column}`) || '', 10);
         const fallback = narrow && column !== 'hash' ? 0 : columnDefaults[column];
         setColumnWidth(column, Number.isFinite(saved) ? saved : fallback);
@@ -1445,9 +1479,9 @@ for (const header of elements.columnHeaders.querySelectorAll('.column-header')) 
             resizer.removeEventListener('pointercancel', onEnd);
             resizer.classList.remove('dragging');
             document.body.classList.remove('resizing');
-            writeSetting('git-graph.column-hash', String(columnWidths.hash));
+            saveColumnWidth('hash');
             if (column !== 'description') {
-                writeSetting(`git-graph.column-${column}`, String(columnWidths[column]));
+                saveColumnWidth(column);
             }
         };
         resizer.addEventListener('pointermove', onMove);
@@ -1460,8 +1494,22 @@ for (const header of elements.columnHeaders.querySelectorAll('.column-header')) 
         const reset = column === 'description' ? 'hash' : column;
         setColumnWidth(reset, columnDefaults[reset]);
         writeSetting(`git-graph.column-${reset}`, null);
+        writeSetting(`git-graph.column-${reset}-restore`, null);
     });
 }
+for (const checkbox of elements.columnToggles) {
+    checkbox.addEventListener('change', () => setColumnVisible(checkbox.dataset.column, checkbox.checked));
+}
+
+// Right-clicking the Commits title row, where the column labels are, shows or hides columns.
+elements.graphPane.querySelector('.pane-header').addEventListener('contextmenu', (event) => {
+    openContextMenu(event, event.currentTarget, Object.entries(columnLabels).map(([column, label]) => ({
+        label,
+        checked: columnWidths[column] > 0,
+        action: () => setColumnVisible(column, columnWidths[column] === 0),
+    })));
+});
+
 // Selects the commit selected last time, if it's in the graph.
 function restoreSelection() {
     const hash = readSetting(settingKeys.selectedCommit);

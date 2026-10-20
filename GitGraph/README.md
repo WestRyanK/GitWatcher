@@ -108,9 +108,11 @@ runtime, which comes with Windows 11. How it works:
   stay against the right edge, and the subjects take the rest of the width, so opening the sidebar or resizing the
   window only narrows the subjects. Drag the edge before a label to resize the column to its left, like a table, and
   the columns after it move along, with the **Commit** column taking up the difference. For example, dragging the
-  edge before **Author** to the right gives the subjects more room. Dragging a column down to nothing hides it (drag
-  its edge back out to show it again). Double-click an edge to reset the column. Narrow windows start without the
-  author and date.
+  edge before **Author** to the right gives the subjects more room. Double-click an edge to reset the column.
+* Show or hide the **Author**, **Date**, and **Commit** columns with the **Columns** checkboxes in the **Options**
+  menu, or by right-clicking the Commits title row. A hidden column's space goes to the subjects, and it comes back
+  at the width it had. Dragging a column down to nothing also hides it. Narrow windows start without the author and
+  date.
 * The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the open
   nodes and folders in the branch tree, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings`
   read and save them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so

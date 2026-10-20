@@ -55,6 +55,15 @@
                     <option value="20000">All</option>
                 </select>
             </label>
+            <fieldset class="option-columns">
+                <legend>Columns</legend>
+                <label class="option-check"><input class="column-toggle" data-column="author" type="checkbox" checked>
+                    Author</label>
+                <label class="option-check"><input class="column-toggle" data-column="date" type="checkbox" checked>
+                    Date</label>
+                <label class="option-check"><input class="column-toggle" data-column="hash" type="checkbox" checked>
+                    Commit</label>
+            </fieldset>
             <div class="option-row">
                 <label class="option-check"><input id="auto-refresh" type="checkbox" checked> Live updates</label>
                 <button id="refresh" type="button">Refresh now</button>
@@ -113,11 +122,11 @@
                     <!-- Labels for the columns on the right of each commit, in the title row so they take no extra
                          space. The edge before a label resizes the column to its left; app.js places the labels. -->
                     <div id="column-headers" class="column-headers">
-                        <span class="column-header" data-column="author"><span class="column-label">Author</span><span
+                        <span class="column-header" data-column="author"><span class="column-label" title="Right-click to show or hide columns">Author</span><span
                                 class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
-                        <span class="column-header" data-column="date"><span class="column-label">Date</span><span
+                        <span class="column-header" data-column="date"><span class="column-label" title="Right-click to show or hide columns">Date</span><span
                                 class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
-                        <span class="column-header" data-column="hash"><span class="column-label">Commit</span><span
+                        <span class="column-header" data-column="hash"><span class="column-label" title="Right-click to show or hide columns">Commit</span><span
                                 class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
                     </div>
                 </header>

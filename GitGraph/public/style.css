@@ -210,6 +210,23 @@ body {
     justify-content: space-between;
 }
 
+.options .option-columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.options .option-columns legend {
+    width: 100%;
+    margin-bottom: 4px;
+    padding: 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+
 .options .option-check {
     display: flex;
     gap: 6px;
@@ -977,6 +994,11 @@ body.resizing.resizing-rows {
 .context-menu-item:focus-visible {
     background: var(--bg-hover);
     outline: none;
+}
+
+.context-menu-check {
+    display: inline-block;
+    width: 18px;
 }
 
 .context-menu-separator {
