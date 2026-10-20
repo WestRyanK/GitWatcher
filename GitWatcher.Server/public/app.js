@@ -222,7 +222,9 @@ function computeLayout(commits, { mainLine, merged }) {
                 lanes[target] = { hash: parent, merged: isMerged, color: index === 0 && target === column ? color : newColor(target) };
             }
             previous = target;
-            parentLanes.push(lanes[target]);
+            // The line to the first parent is this commit's branch carrying on, so it keeps the commit's color even
+            // when it joins another lane. Lines to later parents are the merged branches, in their own colors.
+            parentLanes.push({ lane: lanes[target], color: index === 0 ? color : lanes[target].color });
         });
 
         // Lanes are matched up by identity, since an inserted lane can move the ones to its right.
@@ -237,8 +239,8 @@ function computeLayout(commits, { mainLine, merged }) {
                 segments.push({ kind: 'through', from: index, to: lanes.indexOf(lane), color: lane.color });
             }
         });
-        for (const lane of parentLanes) {
-            segments.push({ kind: 'out', from: column, to: lanes.indexOf(lane), color: lane.color });
+        for (const { lane, color: lineColor } of parentLanes) {
+            segments.push({ kind: 'out', from: column, to: lanes.indexOf(lane), color: lineColor });
         }
 
         while (lanes.length > 0 && lanes[lanes.length - 1] === null) {
