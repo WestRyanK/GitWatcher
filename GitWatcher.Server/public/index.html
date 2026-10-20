@@ -157,8 +157,10 @@
                             <button id="diff-side-by-side" class="diff-button" type="button" aria-pressed="false">Side by
                                 side</button>
                         </span>
-                        <label class="diff-whitespace"><input id="diff-ignore-whitespace" type="checkbox"> Ignore
+                        <label class="diff-option"><input id="diff-ignore-whitespace" type="checkbox"> Ignore
                             whitespace</label>
+                        <label class="diff-option"><input id="diff-syntax" type="checkbox" checked> Syntax
+                            colors</label>
                         <button id="diff-close" class="diff-button" type="button" title="Close (Esc)"
                             aria-label="Close the diff">✕</button>
                     </div>
@@ -182,6 +184,9 @@
         </div>
     </main>
     <div id="context-menu" class="context-menu" role="menu" aria-label="Actions" hidden></div>
+    <script src="vendor/highlight.js/highlight.min.js"></script>
+    <script src="vendor/highlight.js/languages/powershell.min.js"></script>
+    <script src="vendor/highlight.js/languages/dos.min.js"></script>
     <script src="app.js"></script>
     <script src="diff.js"></script>
 </body>

@@ -169,6 +169,121 @@ function addWordHighlights(lines) {
     }
 }
 
+// Syntax colors come from highlight.js (public/vendor/highlight.js), chosen by the file's extension. Each side of the
+// file, old and new, is highlighted as a whole, so comments and strings that span lines are colored right, and then
+// split back into lines. Larger files are shown without colors, since highlighting them would be slow.
+const syntaxLineLimit = 10000;
+const syntaxCharacterLimit = 500000;
+
+// Extensions that highlight.js doesn't know by name.
+const syntaxLanguageAliases = {
+    config: 'xml',
+    csproj: 'xml',
+    manifest: 'xml',
+    nuspec: 'xml',
+    props: 'xml',
+    resx: 'xml',
+    svg: 'xml',
+    targets: 'xml',
+    vcxproj: 'xml',
+    xaml: 'xml',
+    psd1: 'powershell',
+    psm1: 'powershell',
+};
+
+function syntaxLanguageFor(filePath) {
+    if (typeof hljs === 'undefined') {
+        return null;
+    }
+    const name = filePath.split('/').pop().toLowerCase();
+    if (name === 'makefile') {
+        return 'makefile';
+    }
+    const dot = name.lastIndexOf('.');
+    if (dot <= 0) {
+        return null;
+    }
+    const extension = name.slice(dot + 1);
+    const language = syntaxLanguageAliases[extension] || extension;
+    return hljs.getLanguage(language) ? language : null;
+}
+
+// Turns highlight.js's HTML into a list of pieces for each line. Each piece is { text, classes }, where classes are
+// the token scopes it's inside, outermost first.
+function splitHighlightedLines(html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const lines = [[]];
+    const walk = (node, classes) => {
+        for (const child of node.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                child.data.split('\n').forEach((part, index) => {
+                    if (index > 0) {
+                        lines.push([]);
+                    }
+                    if (part) {
+                        lines[lines.length - 1].push({ text: part, classes });
+                    }
+                });
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+                walk(child, child.className ? [...classes, child.className] : classes);
+            }
+        }
+    };
+    walk(template.content, []);
+    return lines;
+}
+
+// Gives each line its syntax pieces for the old side, the new side, or both (context lines), as line.syntax.old and
+// line.syntax.new.
+function addSyntaxHighlights(lines, filePath) {
+    const language = syntaxLanguageFor(filePath);
+    if (!language || lines.length > syntaxLineLimit) {
+        return;
+    }
+    const sides = {
+        old: lines.filter((line) => line.type === 'context' || line.type === 'deleted'),
+        new: lines.filter((line) => line.type === 'context' || line.type === 'added'),
+    };
+    const texts = {};
+    for (const [side, sideLines] of Object.entries(sides)) {
+        texts[side] = sideLines.map((line) => line.text).join('\n');
+        if (texts[side].length > syntaxCharacterLimit) {
+            return;
+        }
+    }
+
+    for (const [side, sideLines] of Object.entries(sides)) {
+        let highlighted;
+        try {
+            highlighted = splitHighlightedLines(hljs.highlight(texts[side], { language, ignoreIllegals: true }).value);
+        } catch {
+            // Shown without colors.
+            return;
+        }
+        sideLines.forEach((line, index) => {
+            const pieces = highlighted[index] || [];
+            // Only pieces that spell out the line exactly can be laid over its words.
+            if (pieces.map((piece) => piece.text).join('') === line.text) {
+                line.syntax ??= {};
+                line.syntax[side] = pieces;
+            }
+        });
+    }
+}
+
+// Appends a run of text in its syntax colors: a span for each token scope it's inside, outermost first.
+function appendSyntaxText(parent, text, classes) {
+    let node = document.createTextNode(text);
+    for (let index = classes.length - 1; index >= 0; index--) {
+        const span = document.createElement('span');
+        span.className = classes[index];
+        span.appendChild(node);
+        node = span;
+    }
+    parent.appendChild(node);
+}
+
 function createDiffCell(className, text) {
     const cell = document.createElement('span');
     cell.className = className;
@@ -178,22 +293,42 @@ function createDiffCell(className, text) {
     return cell;
 }
 
-function createCodeCell(line, sideClass) {
+// The code of one line, on the old or new side, with its changed words highlighted and its syntax colored. A changed
+// word gets one highlight, with its syntax colors inside it.
+function createCodeCell(line, sideClass, side) {
     const cell = createDiffCell(`diff-code ${sideClass}`);
     if (!line) {
         return cell;
     }
-    if (line.segments) {
-        for (const segment of line.segments) {
-            const span = document.createElement('span');
-            span.textContent = segment.text;
-            if (segment.changed) {
-                span.className = 'diff-word';
-            }
-            cell.appendChild(span);
-        }
-    } else {
+    const pieces = line.syntax?.[side];
+    if (!line.segments && !pieces) {
         cell.textContent = line.text;
+        return cell;
+    }
+
+    const segments = line.segments || [{ text: line.text, changed: false }];
+    const syntax = pieces || [{ text: line.text, classes: [] }];
+    let pieceIndex = 0;
+    let pieceOffset = 0;
+    for (const segment of segments) {
+        let target = cell;
+        if (segment.changed) {
+            target = document.createElement('span');
+            target.className = 'diff-word';
+            cell.appendChild(target);
+        }
+        let remaining = segment.text.length;
+        while (remaining > 0 && pieceIndex < syntax.length) {
+            const piece = syntax[pieceIndex];
+            const length = Math.min(remaining, piece.text.length - pieceOffset);
+            appendSyntaxText(target, piece.text.slice(pieceOffset, pieceOffset + length), piece.classes);
+            remaining -= length;
+            pieceOffset += length;
+            if (pieceOffset === piece.text.length) {
+                pieceIndex++;
+                pieceOffset = 0;
+            }
+        }
     }
     return cell;
 }
@@ -215,7 +350,7 @@ function renderUnified(lines) {
         gutter.appendChild(createDiffCell('diff-gutter-number', line.newNumber ?? ''));
         grid.appendChild(gutter);
         grid.appendChild(createDiffCell(`diff-marker ${lineClass}`, line.type === 'added' ? '+' : line.type === 'deleted' ? '-' : ''));
-        grid.appendChild(createCodeCell(line, lineClass));
+        grid.appendChild(createCodeCell(line, lineClass, line.type === 'deleted' ? 'old' : 'new'));
     }
     return grid;
 }
@@ -231,9 +366,9 @@ function renderSideBySide(lines) {
         const leftClass = left ? lineClasses[left.type] : 'diff-empty';
         const rightClass = right ? lineClasses[right.type] : 'diff-empty';
         leftGrid.appendChild(createDiffCell(`diff-number ${leftClass}`, left?.oldNumber ?? ''));
-        leftGrid.appendChild(createCodeCell(left, leftClass));
+        leftGrid.appendChild(createCodeCell(left, leftClass, 'old'));
         rightGrid.appendChild(createDiffCell(`diff-number ${rightClass}`, right?.newNumber ?? ''));
-        rightGrid.appendChild(createCodeCell(right, rightClass));
+        rightGrid.appendChild(createCodeCell(right, rightClass, 'new'));
     };
 
     let index = 0;
@@ -353,6 +488,7 @@ const diffElements = {
     unified: document.getElementById('diff-unified'),
     sideBySide: document.getElementById('diff-side-by-side'),
     ignoreWhitespace: document.getElementById('diff-ignore-whitespace'),
+    syntax: document.getElementById('diff-syntax'),
     close: document.getElementById('diff-close'),
 };
 
@@ -467,6 +603,10 @@ function renderDiff() {
         return;
     }
 
+    if (diffElements.syntax.checked) {
+        addSyntaxHighlights(parsed.lines, diffState.files[diffState.index].path);
+    }
+
     const sideBySide = diffElements.sideBySide.getAttribute('aria-pressed') === 'true';
     const rendered = sideBySide
         ? renderSideBySide(parsed.lines)
@@ -504,6 +644,7 @@ function stepDiff(step) {
 function loadDiffSettings() {
     setDiffLayout(readSetting('git-watcher.diff-side-by-side') === 'true', false);
     diffElements.ignoreWhitespace.checked = readSetting('git-watcher.diff-ignore-whitespace') === 'true';
+    diffElements.syntax.checked = readSetting('git-watcher.diff-syntax') !== 'false';
 }
 
 diffElements.previous.addEventListener('click', () => stepDiff(-1));
@@ -514,6 +655,12 @@ diffElements.sideBySide.addEventListener('click', () => setDiffLayout(true, true
 diffElements.ignoreWhitespace.addEventListener('change', () => {
     writeSetting('git-watcher.diff-ignore-whitespace', diffElements.ignoreWhitespace.checked ? 'true' : null);
     loadDiff();
+});
+diffElements.syntax.addEventListener('change', () => {
+    writeSetting('git-watcher.diff-syntax', diffElements.syntax.checked ? null : 'false');
+    if (isDiffOpen() && diffState.result) {
+        renderDiff();
+    }
 });
 
 // Escape closes the view; Alt+Up and Alt+Down step through the files. This listens before the page's other keys, so

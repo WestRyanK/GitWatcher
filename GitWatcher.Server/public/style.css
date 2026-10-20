@@ -24,6 +24,13 @@
     --diff-added-word: rgb(46 160 67 / 0.38);
     --diff-deleted-bg: rgb(248 81 73 / 0.14);
     --diff-deleted-word: rgb(248 81 73 / 0.38);
+    --syntax-keyword: #cf222e;
+    --syntax-string: #0a3069;
+    --syntax-comment: #6e7781;
+    --syntax-constant: #0550ae;
+    --syntax-function: #8250df;
+    --syntax-type: #953800;
+    --syntax-tag: #116329;
     color-scheme: light;
 }
 
@@ -49,6 +56,13 @@
         --modified: #d29922;
         --renamed: #a371f7;
         --node-stroke: #0d1117;
+        --syntax-keyword: #ff7b72;
+        --syntax-string: #a5d6ff;
+        --syntax-comment: #8b949e;
+        --syntax-constant: #79c0ff;
+        --syntax-function: #d2a8ff;
+        --syntax-type: #ffa657;
+        --syntax-tag: #7ee787;
         color-scheme: dark;
     }
 }
@@ -1139,7 +1153,7 @@ body.resizing.resizing-rows {
     background: var(--bg-selected);
 }
 
-.diff-whitespace {
+.diff-option {
     display: flex;
     gap: 4px;
     align-items: center;
@@ -1298,6 +1312,82 @@ body.resizing.resizing-rows {
 .diff-deleted .diff-word {
     border-radius: 2px;
     background: var(--diff-deleted-word);
+}
+
+/* Syntax colors for highlight.js's token scopes. Inner scopes win, since their spans are nested inside. */
+.diff-code .hljs-keyword,
+.diff-code .hljs-doctag,
+.diff-code .hljs-template-tag,
+.diff-code .hljs-template-variable,
+.diff-code .hljs-variable.language_ {
+    color: var(--syntax-keyword);
+}
+
+.diff-code .hljs-string,
+.diff-code .hljs-regexp {
+    color: var(--syntax-string);
+}
+
+.diff-code .hljs-comment,
+.diff-code .hljs-code,
+.diff-code .hljs-formula {
+    color: var(--syntax-comment);
+}
+
+.diff-code .hljs-number,
+.diff-code .hljs-literal,
+.diff-code .hljs-attr,
+.diff-code .hljs-attribute,
+.diff-code .hljs-meta,
+.diff-code .hljs-operator,
+.diff-code .hljs-variable,
+.diff-code .hljs-selector-attr,
+.diff-code .hljs-selector-class,
+.diff-code .hljs-selector-id,
+.diff-code .hljs-section {
+    color: var(--syntax-constant);
+}
+
+.diff-code .hljs-title,
+.diff-code .hljs-title.function_ {
+    color: var(--syntax-function);
+}
+
+.diff-code .hljs-type,
+.diff-code .hljs-title.class_,
+.diff-code .hljs-built_in,
+.diff-code .hljs-symbol,
+.diff-code .hljs-bullet {
+    color: var(--syntax-type);
+}
+
+.diff-code .hljs-name,
+.diff-code .hljs-quote,
+.diff-code .hljs-selector-tag,
+.diff-code .hljs-selector-pseudo {
+    color: var(--syntax-tag);
+}
+
+.diff-code .hljs-subst,
+.diff-code .hljs-params {
+    color: var(--fg);
+}
+
+.diff-code .hljs-meta .hljs-keyword {
+    color: var(--syntax-keyword);
+}
+
+.diff-code .hljs-meta .hljs-string {
+    color: var(--syntax-string);
+}
+
+.diff-code .hljs-section,
+.diff-code .hljs-strong {
+    font-weight: 600;
+}
+
+.diff-code .hljs-emphasis {
+    font-style: italic;
 }
 
 .diff-empty {

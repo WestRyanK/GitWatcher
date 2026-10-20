@@ -535,6 +535,9 @@ const staticFiles = {
     '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
     '/diff.js': { file: 'diff.js', type: 'text/javascript; charset=utf-8' },
     '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
+    '/vendor/highlight.js/highlight.min.js': { file: 'vendor/highlight.js/highlight.min.js', type: 'text/javascript; charset=utf-8' },
+    '/vendor/highlight.js/languages/powershell.min.js': { file: 'vendor/highlight.js/languages/powershell.min.js', type: 'text/javascript; charset=utf-8' },
+    '/vendor/highlight.js/languages/dos.min.js': { file: 'vendor/highlight.js/languages/dos.min.js', type: 'text/javascript; charset=utf-8' },
 };
 
 function sendJson(response, statusCode, body) {

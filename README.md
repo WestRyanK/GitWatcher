@@ -112,6 +112,9 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
   - The whole file is shown, scrolled to the first change, with the changed words highlighted. Choose **Unified**
     or **Side by side**, and **Ignore whitespace** to hide whitespace-only changes. Side by side scrolls the two
     panes together; drag the divider between them to resize them.
+  - **Syntax colors** colors the code by its language, chosen from the file's extension. Each side of the file is
+    colored as a whole, so comments and strings that span lines come out right, and the changed-word highlights
+    sit on top. Files over 10,000 lines or 500 KB are shown without colors. The choice is remembered.
   - The arrows (or Alt+Up and Alt+Down) step through the other files in the same list, and Escape or ✕ closes the
     view. A binary file just says that it changed, and a diff over 20,000 lines asks before showing.
 * **Right-click menus:** right-click a commit to copy its hash, short hash, subject, or full message, show its
@@ -148,7 +151,11 @@ Git Watcher never changes your repository. Its menus copy commands for you to ru
 
 ### The server and page
 
-The page is plain HTML, JavaScript, and SVG in `GitWatcher.Server/public`.
+The page is plain HTML, JavaScript, and SVG in `GitWatcher.Server/public`. The diff view's syntax colors come from
+[highlight.js](https://highlightjs.org/) 11.11.1 (BSD-3-Clause), whose prebuilt files from cdnjs are kept in
+`public/vendor/highlight.js`: the core with its common languages, plus PowerShell and batch files. To add another
+language, add its file from `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/` there, in
+`index.html`, and in `server.js`'s list of static files.
 
 * `GET /api/graph?scope=S&limit=N` returns commits from `git log --topo-order`, plus refs and HEAD.
   `public/app.js` lays the commits out in lanes and draws the graph as plain SVG.
