@@ -67,11 +67,13 @@ function laneColor(lane) {
     return laneColors[lane % laneColors.length];
 }
 
-// Finds the commits drawn in the leftmost lane: the first-parent history of the repository's default branch, from
-// both the local branch and its copy on origin. Falls back to main, then master, when origin/HEAD isn't set.
-function findMainLine(data) {
+// Finds the default branch's commits: its first-parent history, which is drawn in the leftmost lane, and everything
+// merged into it. Uses both the local branch and its copy on origin, and falls back to main, then master, when
+// origin/HEAD isn't set.
+function findMainBranch(data) {
     const commitsByHash = new Map(data.commits.map((commit) => [commit.hash, commit]));
     const mainLine = new Set();
+    const merged = new Set();
     const names = [...new Set([data.defaultBranch, 'main', 'master'].filter(Boolean))];
     for (const name of names) {
         const tips = data.refs.filter((ref) =>
@@ -79,97 +81,161 @@ function findMainLine(data) {
         if (tips.length === 0) {
             continue;
         }
+        const pending = [];
         for (const tip of tips) {
             let commit = commitsByHash.get(tip.hash);
             while (commit && !mainLine.has(commit.hash)) {
                 mainLine.add(commit.hash);
                 commit = commitsByHash.get(commit.parents[0]);
             }
+            pending.push(tip.hash);
+        }
+        while (pending.length > 0) {
+            const commit = commitsByHash.get(pending.pop());
+            if (commit && !merged.has(commit.hash)) {
+                merged.add(commit.hash);
+                pending.push(...commit.parents);
+            }
         }
         break;
     }
-    return mainLine;
+    return { mainLine, merged };
 }
 
 // Assigns each commit a lane (column). Commits must be in topological order, children first.
 // Each row records the line segments drawn through it: from the top edge into the commit,
-// straight through the row, and from the commit down to the bottom edge.
-// Lane 0 is kept for the main line, and a merge's parents are laid out left to right in parent order. A lane holds
-// the hash of the commit it leads to, and two lanes can lead to the same commit; they join at that commit's row.
-function computeLayout(commits, mainLine) {
+// through the row, and from the commit down to the bottom edge.
+// Lane 0 is kept for the main line, branches merged into main sit left of branches that aren't, and a merge's parents
+// are laid out left to right in parent order. A lane is { hash, merged, color }: the commit it leads to, whether the
+// commit that drew it is merged into main, and its color, which stays the same when the lane moves sideways. Two lanes
+// can lead to the same commit; they join at that commit's row.
+function computeLayout(commits, { mainLine, merged }) {
     const lanes = [];
     const rows = [];
     let laneCount = 0;
+    let column = -1;
     const firstFreeLane = mainLine.size > 0 ? 1 : 0;
 
-    // The first free lane at or after start, adding one on the right when none is free.
-    const freeLane = (start) => {
-        while (lanes.length < start) {
+    // A free lane at or after start for a merged branch, left of every unmerged one. When there's no room, one is
+    // inserted there and the unmerged lanes move right.
+    const mergedLane = (start) => {
+        const unmerged = lanes.findIndex((lane) => lane !== null && !lane.merged);
+        const end = unmerged === -1 ? lanes.length : unmerged;
+        for (let index = start; index < end; index++) {
+            if (lanes[index] === null) {
+                return index;
+            }
+        }
+        const index = Math.max(start, end);
+        while (lanes.length < index) {
             lanes.push(null);
         }
-        let lane = lanes.indexOf(null, start);
-        if (lane === -1) {
-            lane = lanes.length;
+        lanes.splice(index, 0, null);
+        if (column >= index) {
+            column++;
+        }
+        return index;
+    };
+
+    // A free lane at or after start for an unmerged branch, right of every merged one.
+    const unmergedLane = (start) => {
+        let index = start;
+        lanes.forEach((lane, at) => {
+            if (lane !== null && lane.merged) {
+                index = Math.max(index, at + 1);
+            }
+        });
+        while (index < lanes.length && lanes[index] !== null) {
+            index++;
+        }
+        while (lanes.length <= index) {
             lanes.push(null);
         }
-        return lane;
+        return index;
+    };
+
+    // A color for a lane starting at index: the lane's usual color, unless an open lane already has it. Lane 0's color
+    // is kept for the main line.
+    const newColor = (index) => {
+        const used = new Set(lanes.filter((lane) => lane !== null).map((lane) => lane.color));
+        if (index === 0 || !used.has(laneColor(index))) {
+            return laneColor(index);
+        }
+        return laneColors.slice(firstFreeLane).find((color) => !used.has(color)) ?? laneColor(index);
     };
 
     for (const commit of commits) {
         const before = lanes.slice();
-        const onMainLine = mainLine.has(commit.hash);
-        let column;
-        if (onMainLine && (lanes.length === 0 || lanes[0] === null || lanes[0] === commit.hash)) {
+        const isMerged = merged.has(commit.hash);
+        const newLane = (start) => (isMerged ? mergedLane(start) : unmergedLane(start));
+        // A merged commit only follows lanes drawn by merged commits, so an unmerged branch never carries on as merged.
+        const canUse = (lane, hash) => lane !== null && lane.hash === hash && (lane.merged || !isMerged);
+
+        column = -1;
+        if (mainLine.has(commit.hash) && (lanes.length === 0 || lanes[0] === null || lanes[0].hash === commit.hash)) {
             column = 0;
             if (lanes.length === 0) {
                 lanes.push(null);
             }
         } else {
-            column = lanes.indexOf(commit.hash);
+            column = lanes.findIndex((lane) => canUse(lane, commit.hash));
             if (column === -1) {
-                column = freeLane(firstFreeLane);
+                column = newLane(firstFreeLane);
             }
         }
-
-        const segments = [];
-        for (let lane = 0; lane < before.length; lane++) {
-            if (before[lane] === commit.hash) {
-                segments.push({ kind: 'in', from: lane, to: column, color: laneColor(lane) });
-                lanes[lane] = null;
-            } else if (before[lane] !== null && before[lane] !== undefined) {
-                segments.push({ kind: 'through', from: lane, to: lane, color: laneColor(lane) });
+        // The commit takes the color of the lane it sits in, and passes it on to its first parent's lane.
+        const color = lanes[column] ? lanes[column].color : newColor(column);
+        lanes.forEach((lane, index) => {
+            if (lane !== null && lane.hash === commit.hash) {
+                lanes[index] = null;
             }
-        }
+        });
 
+        const parentLanes = [];
         let previous = -1;
         commit.parents.forEach((parent, index) => {
             let target;
             if (index === 0 && column === 0 && mainLine.has(parent)) {
                 // The main line carries on down lane 0, even if another lane already leads to this parent.
                 target = 0;
-            } else if (index === 0) {
-                target = lanes.indexOf(parent);
-                if (target === -1) {
-                    target = lanes[column] === null ? column : freeLane(firstFreeLane);
-                }
             } else {
                 // Later parents go right of the one before, in a second lane if the parent's lane is to the left.
-                target = lanes.indexOf(parent, previous + 1);
+                target = lanes.findIndex((lane, at) => at > previous && canUse(lane, parent));
                 if (target === -1) {
-                    target = freeLane(Math.max(previous + 1, firstFreeLane));
+                    target = index === 0 && lanes[column] === null
+                        ? column
+                        : newLane(Math.max(previous + 1, firstFreeLane));
                 }
             }
-            lanes[target] = parent;
+            if (lanes[target] === null) {
+                lanes[target] = { hash: parent, merged: isMerged, color: index === 0 && target === column ? color : newColor(target) };
+            }
             previous = target;
-            segments.push({ kind: 'out', from: column, to: target, color: laneColor(target) });
+            parentLanes.push(lanes[target]);
         });
+
+        // Lanes are matched up by identity, since an inserted lane can move the ones to its right.
+        const segments = [];
+        before.forEach((lane, index) => {
+            if (lane === null) {
+                return;
+            }
+            if (lane.hash === commit.hash) {
+                segments.push({ kind: 'in', from: index, to: column, color: lane.color });
+            } else {
+                segments.push({ kind: 'through', from: index, to: lanes.indexOf(lane), color: lane.color });
+            }
+        });
+        for (const lane of parentLanes) {
+            segments.push({ kind: 'out', from: column, to: lanes.indexOf(lane), color: lane.color });
+        }
 
         while (lanes.length > 0 && lanes[lanes.length - 1] === null) {
             lanes.pop();
         }
 
         laneCount = Math.max(laneCount, before.length, lanes.length, column + 1);
-        rows.push({ commit, column, segments });
+        rows.push({ commit, column, color, segments });
     }
 
     return { rows, laneCount };
@@ -214,7 +280,7 @@ function buildSvg(layout, headHash) {
         }
 
         const x = laneX(row.column);
-        const color = laneColor(row.column);
+        const color = row.color;
         const isMerge = row.commit.parents.length > 1;
         if (row.commit.hash === headHash) {
             nodes.push(`<circle cx="${x}" cy="${center}" r="${nodeRadius + 3}" fill="none" stroke="${color}" stroke-width="2"/>`);
@@ -282,7 +348,7 @@ function buildRefBadges(data) {
 
 function render(data) {
     const scrollTop = elements.graphScroll.scrollTop;
-    const layout = computeLayout(data.commits, findMainLine(data));
+    const layout = computeLayout(data.commits, findMainBranch(data));
     const { svg, width } = buildSvg(layout, data.head.hash);
     const badgesByHash = buildRefBadges(data);
 
