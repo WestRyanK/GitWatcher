@@ -495,6 +495,7 @@ const settingKeys = {
     selectedCommit: 'git-watcher.selected-commit',
     collapsedPrefix: 'git-watcher.collapsed.',
     tagGrouping: 'git-watcher.tag-grouping',
+    theme: 'git-watcher.theme',
 };
 const keyboardResizeStep = 24;
 const settingsSaveDelayMs = 300;
@@ -1325,6 +1326,35 @@ elements.refresh.addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', poll);
 
+// Theme: System follows the system's light or dark mode as it changes; Light and Dark override it. The page's colors
+// switch on the root element's data-theme. The choice is also kept in local storage, which the page's head reads to
+// set the theme before it first draws.
+const themeButtons = [...document.querySelectorAll('.theme-button')];
+const systemDarkQuery = matchMedia('(prefers-color-scheme: dark)');
+
+function applyTheme() {
+    const choice = readSetting(settingKeys.theme) || 'system';
+    const dark = choice === 'dark' || (choice === 'system' && systemDarkQuery.matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    for (const button of themeButtons) {
+        button.setAttribute('aria-pressed', String(button.dataset.themeChoice === choice));
+    }
+    try {
+        localStorage.setItem('gitWatcherTheme', choice);
+    } catch {
+        // Without local storage, the page may draw in the system's theme for a moment before the settings load.
+    }
+}
+
+for (const button of themeButtons) {
+    button.addEventListener('click', () => {
+        const choice = button.dataset.themeChoice;
+        writeSetting(settingKeys.theme, choice === 'system' ? null : choice);
+        applyTheme();
+    });
+}
+systemDarkQuery.addEventListener('change', applyTheme);
+
 // Toolbar and filter controls whose values are remembered.
 const rememberedControls = [
     { element: elements.scope, key: settingKeys.scope, event: 'change' },
@@ -1562,6 +1592,7 @@ function restoreSelection() {
 
 async function initialize() {
     await loadSettings();
+    applyTheme();
     loadLayoutSettings();
     restoreControls();
     loadColumnWidths();

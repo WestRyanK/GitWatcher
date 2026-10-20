@@ -89,6 +89,9 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
 * **Commits:** the graph lays commits out in lanes, with badges for branches, tags, and HEAD. The commit filter,
   **Commits from** (`current`: HEAD only, `local`: local branches and HEAD, or `all`: also remote branches and tags),
   **Show** (how many commits), and **Live** are in the **Options** menu (the sliders icon at the top right).
+* **Theme:** choose **System**, **Light**, or **Dark** in the **Options** menu. **System** follows Windows' light or
+  dark mode as it changes. The Windows Terminal panel's own frame and its minimized button always follow Windows'
+  mode.
 * **Commit details** are below the graph: the full message, author, date, and changed files. Double-click a commit
   to open them if they're collapsed. Click a pane's title to collapse it to its title row or open it again.
 * **Columns:** the **Author**, **Date**, and **Commit** labels in the Commits title row line up with those columns.

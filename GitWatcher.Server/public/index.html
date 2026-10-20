@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Git Watcher</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+        // Sets the theme before the page draws, from the choice this browser saw last (app.js keeps it up to date),
+        // so a dark page doesn't flash light while the settings load.
+        (() => {
+            let choice = 'system';
+            try {
+                choice = localStorage.getItem('gitWatcherTheme') || 'system';
+            } catch {
+                // Local storage can be unavailable; follow the system then.
+            }
+            const dark = choice === 'dark' || (choice === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        })();
+    </script>
 </head>
 <body>
     <header class="toolbar">
@@ -62,7 +76,16 @@
                     <option value="hyphen">Hyphen (-)</option>
                     <option value="none">Don't group</option>
                 </select>
-            </label>            <fieldset class="option-columns">
+            </label>
+            <div class="option-theme">
+                <span id="theme-label">Theme</span>
+                <span class="theme-switch" role="group" aria-labelledby="theme-label">
+                    <button class="theme-button" type="button" data-theme-choice="system" aria-pressed="true">System</button>
+                    <button class="theme-button" type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+                    <button class="theme-button" type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+                </span>
+            </div>
+            <fieldset class="option-columns">
                 <legend>Columns</legend>
                 <label class="option-check"><input class="column-toggle" data-column="author" type="checkbox" checked>
                     Author</label>
