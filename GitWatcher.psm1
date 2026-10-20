@@ -1,268 +1,83 @@
-Function Format-AnsiEscapedString {
-    param([string] $AnsiString, [int] $MaxLength)
+function Start-GitWatcher {
+    <#
+    .SYNOPSIS
+        Docks Git Watcher, the live git graph viewer, to the right side of the current terminal window.
 
-    $IsInEscape = $False
-    for (($i = 0), ($Count = 0); ($i -lt $AnsiString.Length) -and ($Count -lt $MaxLength); $i++) {
-        $Char = $AnsiString[$i]
-        if ($Char -eq "`e") {
-            $IsInEscape = $True
-        }
-        if (!($IsInEscape)) {
-            $Count++
-        }
-        if ($Char -eq "m") {
-            $IsInEscape = $False
-        }
-    }
+    .DESCRIPTION
+        Starts GitWatcher.Overlay, a small WPF app that shows Git Watcher for a repository in a panel docked to the
+        right side of the terminal window you run this from. In Windows Terminal it splits the current tab and covers
+        the new pane, so your shell's text wraps before the panel. The panel follows the window when you move or
+        resize it, hides when you minimize it or switch tabs, and closes when you close the window or this shell.
 
-    $ResizedString = $AnsiString.Substring(0, $i)
-    return $ResizedString
-}
+        The first run builds the app (it needs the .NET 10 SDK), and so does any run after its sources change. The
+        viewer also needs Node.js on PATH and the WebView2 runtime, which comes with Windows 11.
 
-Function Format-WrappedAnsiEscapedLines {
-    param([string[]] $Lines, [int] $WrapWidth, [int] $MaxLines)
+    .PARAMETER Path
+        The folder whose repository to show. Defaults to the current directory.
 
-    $OutputLines = @()
-    for (($i = 0), ($Count = 0); ($i -lt $Lines.Length -and $Count -lt $MaxLines); ($i++)) {
+    .EXAMPLE
+        Start-GitWatcher
 
-        $Line = $Lines[$i]
-        while ($Line.Length -gt 0 -and $Count -lt $MaxLines) {
-            $WrappedLine = Format-AnsiEscapedString $Line $WrapWidth
-            $OutputLines += $WrappedLine
-            $Count++
-            $Line = $Line.Substring($WrappedLine.Length, $Line.Length - $WrappedLine.Length)
-        }
-    }
-    return $OutputLines
-}
+        Shows the current directory's repository next to this terminal.
 
-Function Write-ClippedCommandOutput {
+    .EXAMPLE
+        Set-Alias gw Start-GitWatcher
+
+        Add this to your PowerShell profile to open the overlay by typing gw.
+    #>
+    [CmdletBinding()]
     param(
-        [ScriptBlock] $Command,
-        [ValidateSet("Wrap", "Clip")] [string] $LineMode
+        [string]$Path = (Get-Location).Path
     )
 
-    $Size = $Host.UI.RawUI.WindowSize
-    $MaxLines = $Size.Height - 1
-    $Lines = Invoke-Command $Command -ArgumentList $MaxLines
-    if ($LineMode -eq "Wrap") {
-        $FormattedLines = Format-WrappedAnsiEscapedLines $Lines $Size.Width $MaxLines
-    }
-    elseif ($LineMode -eq "Clip") {
-        $FormattedLines = $Lines | Foreach-Object { Format-AnsiEscapedString $_ $Size.Width }
-        $FormattedLines = $FormattedLines[0..($MaxLines - 1)]
-    }
-    $Output = $FormattedLines | Join-String -Separator "`n"
-    Clear-Host
-    Write-Host $Output
-}
+    $ErrorActionPreference = 'Stop'
 
-Function Write-GitGraph {
-    param(
-        [string] $Path,
-        [switch] $Paginate,
-        [ValidateSet("Wrap", "Clip")] [string] $LineMode
-    )
-
-    if ($Paginate) {
-        git -C "$Path" log --graph --oneline --branches
-    }
-    else {
-        Write-ClippedCommandOutput -LineMode $LineMode {
-            git -C "$Path" --no-pager log --graph --oneline --branches --decorate --color=always -$MaxLines
-        }
-    }
-}
-
-Function Write-GitBranch {
-    param(
-        [string] $Path,
-        [switch] $Paginate,
-        [ValidateSet("Wrap", "Clip")] [string] $LineMode
-    )
-
-    if ($Paginate) {
-        git -c color.branch=always -C "$Path" branch
-    }
-    else {
-        Write-ClippedCommandOutput -LineMode $LineMode {
-            git -c color.branch=always -C "$Path" --no-pager branch
-        }
-    }
-}
-
-Function Write-GitStatus {
-    param(
-        [string] $Path,
-        [switch] $Paginate,
-        [ValidateSet("Wrap", "Clip")] [string] $LineMode
-    )
-
-    if ($Paginate) {
-        git -c color.status=always -C "$Path" -p status
-    }
-    else {
-        Write-ClippedCommandOutput -LineMode $LineMode {
-            git -c color.status=always -C "$Path" status
-        }
-    }
-}
-
-Function Write-Git {
-    param(
-        [string] $Path,
-        [string] $LiveMessage,
-        [string] $RepoName,
-        [string] $GitCommand,
-        [switch] $Paginate,
-        [ValidateSet("Wrap", "Clip")] [string] $LineMode
-    )
-
-    if ($GitCommand -eq "Graph") {
-        Write-GitGraph -Path $Path -Paginate:$Paginate -LineMode $LineMode
-    }
-    elseif ($GitCommand -eq "Status") {
-        Write-GitStatus -Path $Path -Paginate:$Paginate -LineMode $LineMode
-    }
-    elseif ($GitCommand -eq "Branch") {
-        Write-GitBranch -Path $Path -Paginate:$Paginate -LineMode $LineMode
-    }
-    if (!$Paginate) {
-        $FormattedMessage = $LiveMessage -f $RepoName
-        Write-Host $FormattedMessage -NoNewline
-    }
-}
-
-Function Initialize-FileSystemWatcher {
-    param([string] $Path)
-
-    $script:Watcher = New-Object System.IO.FileSystemWatcher $WatchPath -Property @{
-        IncludeSubdirectories = $True
-        EnableRaisingEvents = $True
-        Filter = "*.*"
-    }
-    $script:ChangeTypes = [System.IO.WatcherChangeTypes]::Created,[System.IO.WatcherChangeTypes]::Changed,[System.IO.WatcherChangeTypes]::Deleted,[System.IO.WatcherChangeTypes]::Renamed
-    $script:Timeout = New-TimeSpan -Milliseconds 100
-}
-
-Function Wait-FileSystemChange {
-    $Result = $script:Watcher.WaitForChanged($script:ChangeTypes, $script:Timeout)
-    return $Result.TimedOut -eq $False -and $Result.Name -notlike "*.lock"
-}
-
-Function Test-GitPath {
-    param([string] $Path)
-    ($Result = (git -C $Path rev-parse --is-inside-work-tree)) 2> $null
-    return $Result -eq "true"
-}
-
-Function Watch-Git {
-    param(
-        [string] $Path,
-        [ValidateSet("Graph", "Status", "Branch")] [String] $GitCommand = "Graph",
-        [double] $UpdateDelaySeconds = 0.5,
-        [string] $LiveMessage = "`e[32m(● Live in '{0}')`e[0m",
-        [ValidateSet("Wrap", "Clip")] [string] $LineMode = "Wrap"
-    )
-
-    if ([String]::IsNullOrWhiteSpace($Path)) {
-        $Path = "."
-    }
-    $Path = $Path | Resolve-Path
-    $RepoName = $Path | Split-Path -Leaf
-    if (!(Test-GitPath $Path)) {
-        Write-Error "not a git repository: $Path"
+    $repositoryPath = (Resolve-Path -LiteralPath $Path).ProviderPath
+    git -C $repositoryPath rev-parse --is-inside-work-tree 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Not a git repository: $repositoryPath"
         return
     }
 
-    $WatchPath = if ($GitCommand -ne "Status") { [System.IO.Path]::Combine($Path, ".git") } else { $Path }
-    Initialize-FileSystemWatcher $WatchPath
+    $projectDirectory = Join-Path $PSScriptRoot 'GitWatcher.Overlay'
+    $project = Join-Path $projectDirectory 'GitWatcher.Overlay.csproj'
+    $executable = Join-Path $projectDirectory 'bin\Release\net10.0-windows\GitWatcher.Overlay.exe'
 
-    $LastChange = [DateTime]::MinValue
-    $Continue = $True
-    while ($Continue) {
-        $IsUpdateAvailable = $null -ne $LastChange -and (New-TimeSpan -Start $LastChange -End (Get-Date)).TotalSeconds -gt $UpdateDelaySeconds
-        if ($IsUpdateAvailable) {
-            Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
-            $LastChange = $null
-        }
-
-        $Host.UI.RawUI.FlushInputBuffer()
-
-        if (Wait-FileSystemChange) {
-            $LastChange = Get-Date
-        }
-
-        $IsKeyDown = [System.Console]::KeyAvailable;
-        if ($IsKeyDown) {
-            $PressedKey = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            if ($PressedKey.Character -eq "q") {
-                $Continue = $False
-            }
-            else {
-                Write-Git $Path $LiveMessage $RepoName $GitCommand -Paginate -LineMode $LineMode
-                Write-Git $Path $LiveMessage $RepoName $GitCommand -LineMode $LineMode
-            }
-        }
-
-        $WindowSize = $Host.UI.RawUI.WindowSize
-        if ($LastWindowSize -ne $WindowSize) {
-            $LastChange = Get-Date
-        }
-        $LastWindowSize = $WindowSize
+    # Build when the app is missing or any of its sources is newer than it.
+    $sources = Get-ChildItem $projectDirectory -File -Recurse -Include *.cs, *.xaml, *.csproj, *.manifest |
+        Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' }
+    $needsBuild = -not (Test-Path $executable)
+    if (-not $needsBuild) {
+        $builtAt = (Get-Item $executable).LastWriteTime
+        $needsBuild = [bool]($sources | Where-Object { $_.LastWriteTime -gt $builtAt })
     }
+
+    # An open overlay locks its program file, so it can't be rebuilt until every overlay is closed.
+    $running = Get-Process -Name GitWatcher.Overlay -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -eq (Resolve-Path -LiteralPath $executable -ErrorAction SilentlyContinue).ProviderPath }
+    if ($needsBuild -and $running) {
+        Write-Warning 'The Git Watcher overlay has changed, but an open overlay is using it. Close all overlays to update it. Starting the current version.'
+        $needsBuild = $false
+    }
+
+    if ($needsBuild) {
+        Write-Host 'Building the Git Watcher overlay...'
+        dotnet build $project --configuration Release --nologo --verbosity quiet
+        if ($LASTEXITCODE -ne 0) {
+            throw 'The Git Watcher overlay failed to build.'
+        }
+    }
+
+    # A trailing backslash would escape the closing quote, as in "C:\".
+    if ($repositoryPath.EndsWith('\')) {
+        $repositoryPath += '.'
+    }
+
+    # The app finds this terminal's window through the console of its parent process, which is this shell. Passing
+    # the shell's process ID closes the overlay when this shell (or its tab) closes.
+    Start-Process -FilePath $executable `
+        -ArgumentList "--repo `"$repositoryPath`" --shell-process $PID" `
+        -WorkingDirectory $repositoryPath
 }
 
-Function Split-LayoutCommands {
-    param([string] $Commands)
-
-    $SeparatorIndex = $Commands.IndexOf(":")
-    if ($SeparatorIndex -eq -1) {
-        return $null
-    }
-    $WindowCommand = $Commands.Substring(0, $SeparatorIndex)
-    $PaneCommand = $Commands.Substring($SeparatorIndex + 1, $Commands.Length - ($SeparatorIndex + 1)).Trim()
-    if ([string]::IsNullOrWhiteSpace($PaneCommand)) {
-        return $null
-    }
-    return ($WindowCommand, $PaneCommand)
-}
-
-Function Start-GitWatcher {
-    param([string] $Path, [switch] $QuakeMode, [string[]] $LayoutCommands)
-
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        $Path = Get-Location
-    }
-
-    if (!(Test-GitPath $Path)) {
-        Write-Error "not a git repository: $Path"
-        return
-    }
-
-    if ($null -eq $LayoutCommands) {
-        $LayoutCommands = "split-pane --vertical:       Watch-Git -GitCommand Graph",
-                    "split-pane --horizontal:           Watch-Git -GitCommand Status",
-                    "split-pane --vertical --size .3:   Watch-Git -GitCommand Branch",
-                    "move-focus first"
-    }
-
-    $Window = if ($QuakeMode) { "_quake" } else { "0" }
-    $WindowCommandString = "-w $Window {0}"
-    $WindowPaneCommandString = $WindowCommandString -f "{0} pwsh -Command & {{ Set-Location '$Path' \; {1} }}"
-
-    $CommandArgs = $LayoutCommands | Foreach-Object {
-        $WindowPaneCommand = Split-LayoutCommands $_
-        if ($null -ne $WindowPaneCommand) {
-            $WindowPaneCommandString -f $WindowPaneCommand[0], $WindowPaneCommand[1]
-        }
-        else {
-            $WindowCommandString -f $_
-        }
-    } | Join-String -Separator "; "
-
-    Start-Process wt -ArgumentList $CommandArgs
-}
-
-Export-ModuleMember -Function Watch-Git
 Export-ModuleMember -Function Start-GitWatcher

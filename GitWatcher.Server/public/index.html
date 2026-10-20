@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Git Watcher</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        // Sets the theme before the page draws, from the choice this browser saw last (app.js keeps it up to date),
+        // so a dark page doesn't flash light while the settings load.
+        (() => {
+            let choice = 'system';
+            try {
+                choice = localStorage.getItem('gitWatcherTheme') || 'system';
+            } catch {
+                // Local storage can be unavailable; follow the system then.
+            }
+            const dark = choice === 'dark' || (choice === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        })();
+    </script>
+</head>
+<body>
+    <header class="toolbar">
+        <div class="title">
+            <strong id="repo-name">Git Watcher</strong>
+            <span id="head-info" class="muted"></span>
+        </div>
+        <span id="status" class="muted status-text" aria-live="polite"></span>
+        <button id="options-toggle" class="options-toggle" type="button" aria-expanded="false" aria-controls="options"
+            aria-haspopup="true" aria-label="Options" title="Options: filters and settings">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M2 4h7M13 4h1M2 12h1M7 12h7M2 8h3M9 8h5" />
+                <circle cx="11" cy="4" r="1.75" />
+                <circle cx="5" cy="12" r="1.75" />
+                <circle cx="7" cy="8" r="1.75" />
+            </svg>
+        </button>
+        <!-- Shown only inside the Windows Terminal overlay (GitWatcher.Overlay), which handles these buttons. -->
+        <div id="host-controls" class="host-controls" hidden>
+            <button id="host-minimize" class="host-button" type="button" title="Minimize to a button"
+                aria-label="Minimize Git Watcher">
+                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3 8h10" /></svg>
+            </button>
+            <button id="host-close" class="host-button" type="button" title="Close" aria-label="Close Git Watcher">
+                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+            </button>
+        </div>
+        <div id="options" class="options controls" role="group" aria-label="Filters and settings" hidden>
+            <label class="option-wide">
+                Filter
+                <input id="filter" type="search" placeholder="Subject, author, or hash" aria-label="Filter commits">
+            </label>
+            <label>
+                Commits from
+                <select id="scope">
+                    <option value="current">Current branch</option>
+                    <option value="local">Local branches</option>
+                    <option value="all" selected>All (local and remote)</option>
+                </select>
+            </label>
+            <label>
+                Show
+                <select id="limit">
+                    <option value="200">200</option>
+                    <option value="500" selected>500</option>
+                    <option value="1000">1,000</option>
+                    <option value="3000">3,000</option>
+                    <option value="20000">All</option>
+                </select>
+            </label>
+            <label>
+                Group tags by
+                <select id="tag-grouping">
+                    <option value="slash" selected>Slash (/)</option>
+                    <option value="hyphen">Hyphen (-)</option>
+                    <option value="none">Don't group</option>
+                </select>
+            </label>
+            <div class="option-theme">
+                <span id="theme-label">Theme</span>
+                <span class="theme-switch" role="group" aria-labelledby="theme-label">
+                    <button class="theme-button" type="button" data-theme-choice="system" aria-pressed="true">System</button>
+                    <button class="theme-button" type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+                    <button class="theme-button" type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+                </span>
+            </div>
+            <fieldset class="option-columns">
+                <legend>Columns</legend>
+                <label class="option-check"><input class="column-toggle" data-column="author" type="checkbox" checked>
+                    Author</label>
+                <label class="option-check"><input class="column-toggle" data-column="date" type="checkbox" checked>
+                    Date</label>
+                <label class="option-check"><input class="column-toggle" data-column="hash" type="checkbox" checked>
+                    Commit</label>
+            </fieldset>
+            <div class="option-row">
+                <label class="option-check"><input id="auto-refresh" type="checkbox" checked> Live updates</label>
+                <button id="refresh" type="button">Refresh now</button>
+            </div>
+        </div>
+    </header>
+    <main id="workspace" class="workspace">
+        <aside id="sidebar" class="sidebar">
+            <!-- Always visible. Each button opens or closes its pane, and shows whether it's open. -->
+            <nav id="sidebar-rail" class="sidebar-rail" aria-label="Sidebar panes">
+                <button id="rail-branches" class="pane-toggle rail-button" type="button" aria-expanded="false"
+                    aria-controls="branches-pane">Branches</button>
+                <button id="rail-working-tree" class="pane-toggle rail-button" type="button" aria-expanded="false"
+                    aria-controls="working-tree-pane">Status</button>
+            </nav>
+            <div id="sidebar-panes" class="sidebar-panes stack">
+                <section id="branches-pane" class="pane sized-pane" aria-labelledby="branches-heading">
+                    <header class="pane-header">
+                        <h2 id="branches-heading">
+                            <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="branches-pane">
+                                <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Branches
+                            </button>
+                        </h2>
+                        <span id="branches-count" class="muted"></span>
+
+                    </header>
+                    <input id="branch-filter" class="pane-filter" type="search" placeholder="Filter branches"
+                        aria-label="Filter branches">
+                    <div id="branches" class="pane-body"></div>
+                </section>
+                <div id="sidebar-splitter" class="splitter" role="separator" tabindex="0" aria-controls="branches-pane"
+                    aria-label="Resize the branches and status panes" title="Drag to resize. Double-click to reset."></div>
+                <section id="working-tree-pane" class="pane" aria-labelledby="working-tree-heading">
+                    <header class="pane-header">
+                        <h2 id="working-tree-heading">
+                            <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="working-tree-pane">
+                                <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Status
+                            </button>
+                        </h2>
+                        <span id="working-tree-count" class="muted"></span>
+                    </header>
+                    <div id="working-tree" class="pane-body"></div>
+                </section>
+            </div>
+        </aside>
+        <div id="workspace-splitter" class="splitter" role="separator" tabindex="0" aria-controls="sidebar"
+            aria-label="Resize the sidebar" title="Drag to resize. Double-click to reset."></div>
+        <div id="layout" class="layout stack">
+            <section id="graph-pane" class="pane" aria-labelledby="graph-heading">
+                <header class="pane-header">
+                    <h2 id="graph-heading">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="graph-pane">
+                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Commits
+                        </button>
+                    </h2>
+                    <!-- Labels for the columns on the right of each commit, in the title row so they take no extra
+                         space. The edge before a label resizes the column to its left; app.js places the labels. -->
+                    <div id="column-headers" class="column-headers">
+                        <span class="column-header" data-column="author"><span class="column-label" title="Right-click to show or hide columns">Author</span><span
+                                class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
+                        <span class="column-header" data-column="date"><span class="column-label" title="Right-click to show or hide columns">Date</span><span
+                                class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
+                        <span class="column-header" data-column="hash"><span class="column-label" title="Right-click to show or hide columns">Commit</span><span
+                                class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
+                    </div>
+                </header>
+                <div id="graph-scroll" class="graph-scroll">
+                    <div id="graph" class="graph"></div>
+                </div>
+                <!-- One file's diff, over the Commits pane. diff.js fills it in. -->
+                <section id="diff-view" class="diff-view" aria-label="Diff" hidden>
+                    <div class="diff-toolbar">
+                        <button id="diff-previous" class="diff-button" type="button" title="Previous file (Alt+Up)"
+                            aria-label="Previous file">‹</button>
+                        <span id="diff-position" class="diff-position muted"></span>
+                        <button id="diff-next" class="diff-button" type="button" title="Next file (Alt+Down)"
+                            aria-label="Next file">›</button>
+                        <span class="diff-heading">
+                            <strong id="diff-title" class="diff-title mono"></strong>
+                            <span id="diff-source" class="diff-source muted"></span>
+                        </span>
+                        <button id="diff-options-toggle" class="options-toggle" type="button" aria-expanded="false"
+                            aria-controls="diff-options" aria-haspopup="true" aria-label="Diff options"
+                            title="Diff options: layout and display">
+                            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                                <path d="M2 4h7M13 4h1M2 12h1M7 12h7M2 8h3M9 8h5" />
+                                <circle cx="11" cy="4" r="1.75" />
+                                <circle cx="5" cy="12" r="1.75" />
+                                <circle cx="7" cy="8" r="1.75" />
+                            </svg>
+                        </button>
+                        <div id="diff-options" class="options controls diff-options" role="group"
+                            aria-label="Diff options" hidden>
+                            <label>
+                                Layout
+                                <select id="diff-layout">
+                                    <option value="unified" selected>Unified</option>
+                                    <option value="side-by-side">Side by side</option>
+                                    <option value="old">Old file only</option>
+                                    <option value="new">New file only</option>
+                                </select>
+                            </label>
+                            <label class="option-check"><input id="diff-ignore-whitespace" type="checkbox"> Ignore
+                                whitespace</label>
+                            <label class="option-check"><input id="diff-syntax" type="checkbox" checked> Syntax
+                                colors</label>
+                        </div>
+                        <button id="diff-close" class="diff-button" type="button" title="Close (Esc)"
+                            aria-label="Close the diff">✕</button>
+                    </div>
+                    <div class="diff-main">
+                        <div id="diff-body" class="diff-body"></div>
+                        <!-- The diff's vertical scroll bar, which also marks the changes. diff.js draws it. -->
+                        <div id="diff-ruler" class="diff-ruler" title="Changes in this file. Click or drag to scroll."
+                            hidden></div>
+                    </div>
+                </section>
+            </section>
+            <div id="splitter" class="splitter" role="separator" tabindex="0" aria-controls="details-pane"
+                aria-label="Resize the commit details panel" title="Drag to resize. Double-click to reset."></div>
+            <section id="details-pane" class="pane sized-pane details-pane" aria-labelledby="details-heading">
+                <header class="pane-header">
+                    <h2 id="details-heading">
+                        <button class="pane-toggle" type="button" aria-expanded="true" aria-controls="details-pane">
+                            <svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg> Commit details
+                        </button>
+                    </h2>
+                </header>
+                <div id="details" class="details">
+                    <p class="muted">Select a commit to see its details.</p>
+                </div>
+            </section>
+        </div>
+    </main>
+    <div id="context-menu" class="context-menu" role="menu" aria-label="Actions" hidden></div>
+    <script src="vendor/highlight.js/highlight.min.js"></script>
+    <script src="vendor/highlight.js/languages/powershell.min.js"></script>
+    <script src="vendor/highlight.js/languages/dos.min.js"></script>
+    <script src="app.js"></script>
+    <script src="diff.js"></script>
+</body>
+</html>

@@ -1,0 +1,1518 @@
+:root {
+    --bg: #ffffff;
+    --bg-alt: #f6f7f9;
+    --bg-hover: #eef2f7;
+    --bg-selected: #dbe7fb;
+    --fg: #1f2328;
+    --muted: #656d76;
+    --border: #d8dee4;
+    --branch-bg: #dafbe1;
+    --branch-fg: #116329;
+    --remote-bg: #ddf4ff;
+    --remote-fg: #0550ae;
+    --tag-bg: #fff8c5;
+    --tag-fg: #7d4e00;
+    --head-bg: #cf222e;
+    --head-fg: #ffffff;
+    --added: #1a7f37;
+    --deleted: #cf222e;
+    --modified: #9a6700;
+    --renamed: #8250df;
+    --node-stroke: #ffffff;
+    --row-height: 26px;
+    --diff-added-bg: rgb(46 160 67 / 0.14);
+    --diff-added-word: rgb(46 160 67 / 0.38);
+    --diff-deleted-bg: rgb(248 81 73 / 0.14);
+    --diff-deleted-word: rgb(248 81 73 / 0.38);
+    --syntax-keyword: #cf222e;
+    --syntax-string: #0a3069;
+    --syntax-comment: #6e7781;
+    --syntax-constant: #0550ae;
+    --syntax-function: #8250df;
+    --syntax-type: #953800;
+    --syntax-tag: #116329;
+    color-scheme: light;
+}
+
+/* Dark colors. The page sets data-theme from the Theme option, or from the system's light or dark mode. */
+:root[data-theme="dark"] {
+    --bg: #0d1117;
+    --bg-alt: #161b22;
+    --bg-hover: #1c2330;
+    --bg-selected: #1f3456;
+    --fg: #e6edf3;
+    --muted: #8d96a0;
+    --border: #30363d;
+    --branch-bg: #0f3d1f;
+    --branch-fg: #7ee787;
+    --remote-bg: #0c2d4f;
+    --remote-fg: #79c0ff;
+    --tag-bg: #3d2e00;
+    --tag-fg: #e3b341;
+    --head-bg: #da3633;
+    --head-fg: #ffffff;
+    --added: #3fb950;
+    --deleted: #f85149;
+    --modified: #d29922;
+    --renamed: #a371f7;
+    --node-stroke: #0d1117;
+    --syntax-keyword: #ff7b72;
+    --syntax-string: #a5d6ff;
+    --syntax-comment: #8b949e;
+    --syntax-constant: #79c0ff;
+    --syntax-function: #d2a8ff;
+    --syntax-type: #ffa657;
+    --syntax-tag: #7ee787;
+    color-scheme: dark;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+/* One line: the repository and HEAD on the left, then the status and the Options button. The filters and settings
+   open in a panel that floats over the content, so the toolbar never takes more than one line. */
+.toolbar {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 6px 12px 6px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-alt);
+}
+
+.title {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: baseline;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.title #head-info {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.status-text {
+    flex: none;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.options-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+.options-toggle:hover,
+.options-toggle:focus-visible,
+.options-toggle[aria-expanded="true"] {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.options-toggle svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
+.options-toggle svg circle {
+    fill: var(--bg);
+}
+
+
+.host-controls {
+    display: flex;
+    flex: none;
+    margin-right: -6px;
+}
+
+.host-controls[hidden] {
+    display: none;
+}
+
+.host-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.host-button:hover,
+.host-button:focus-visible {
+    background: var(--bg-hover);
+    color: var(--fg);
+    outline: none;
+}
+
+.host-button svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
+.options {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 12px;
+    z-index: 20;
+    display: grid;
+    gap: 10px;
+    width: min(320px, calc(100vw - 24px));
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-alt);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.options[hidden] {
+    display: none;
+}
+
+.options label {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.options .option-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.options .option-theme {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.theme-switch {
+    display: flex;
+}
+
+.theme-button {
+    flex: 1;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.theme-button + .theme-button {
+    margin-left: -1px;
+}
+
+.theme-button:first-child {
+    border-radius: 6px 0 0 6px;
+}
+
+.theme-button:last-child {
+    border-radius: 0 6px 6px 0;
+}
+
+.theme-button:hover {
+    background: var(--bg-hover);
+}
+
+.theme-button[aria-pressed="true"] {
+    background: var(--bg-selected);
+}
+
+.options .option-columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.options .option-columns legend {
+    width: 100%;
+    margin-bottom: 4px;
+    padding: 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.options .option-check {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--fg);
+}
+
+.controls input[type="search"],
+.controls select,
+.controls button {
+    font: inherit;
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+.controls input[type="search"],
+.controls select {
+    width: 100%;
+}
+
+.controls button {
+    cursor: pointer;
+}
+
+.controls button:hover {
+    background: var(--bg-hover);
+}
+
+.workspace {
+    flex: 1;
+    display: grid;
+    grid-template-columns: clamp(180px, var(--sidebar-width, 300px), calc(100% - 320px)) auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+}
+
+
+/* A splitter draws the divider line and has a wider area to grab. app.js adds "horizontal" to splitters between
+   stacked panes. */
+.splitter {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 1px;
+    margin: 0 -3px;
+    padding: 0 3px;
+    background: var(--border);
+    background-clip: content-box;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.splitter.horizontal {
+    width: auto;
+    height: 1px;
+    margin: -3px 0;
+    padding: 3px 0;
+    cursor: row-resize;
+}
+
+.splitter:hover,
+.splitter:focus-visible,
+.splitter.dragging {
+    background-color: var(--remote-fg);
+    outline: none;
+}
+
+body.resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+body.resizing.resizing-rows {
+    cursor: row-resize;
+}
+
+/* A stack holds two panes, one above the other. The sized pane keeps the height set by the splitter, and the other
+   pane fills the rest. When either pane is collapsed or hidden, the splitter goes away and an open pane fills the
+   space. */
+.stack {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.stack > .pane {
+    flex: 1 1 0;
+}
+
+.stack > .sized-pane {
+    flex: 0 0 clamp(var(--pane-minimum), var(--pane-size), calc(100% - var(--pane-minimum)));
+}
+
+/* The splitters set --branches-height and --details-height on the stack. */
+#branches-pane {
+    --pane-minimum: 80px;
+    --pane-size: var(--branches-height, 55%);
+}
+
+#details-pane {
+    --pane-minimum: 120px;
+    --pane-size: var(--details-height, 40%);
+}
+
+.stack.has-closed-pane > .splitter {
+    display: none;
+}
+
+.stack.has-closed-pane > .sized-pane {
+    flex: 1 1 0;
+}
+
+.stack > .pane.collapsed {
+    flex: 0 0 auto;
+}
+
+.stack > .pane.collapsed > :not(.pane-header) {
+    display: none;
+}
+
+/* The sidebar is the rail of pane buttons, which is always visible, and the open panes beside it. With both the
+   Branches and Status panes closed, only the rail is left. */
+.sidebar {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg-alt);
+}
+
+.sidebar-rail {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 3px;
+    border-right: 1px solid var(--border);
+}
+
+.sidebar-panes {
+    flex: 1;
+}
+
+/* A closed pane disappears; its rail button opens it again. */
+.sidebar-panes > .pane.collapsed,
+.sidebar.collapsed > .sidebar-panes {
+    display: none;
+}
+
+.workspace.sidebar-collapsed {
+    grid-template-columns: auto minmax(0, 1fr);
+}
+
+.workspace.sidebar-collapsed > #workspace-splitter {
+    display: none;
+}
+
+.sidebar-rail .rail-button {
+    writing-mode: vertical-rl;
+    padding: 10px 3px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* An open pane's button is highlighted, with a bar on the side next to the panes. */
+.sidebar-rail .rail-button[aria-expanded="true"] {
+    color: var(--fg);
+    background: var(--bg-hover);
+    box-shadow: inset -2px 0 0 var(--remote-fg);
+}
+.pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.pane-header {
+    display: flex;
+    flex: none;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 12px 6px 6px;
+}
+
+.details-pane > .pane-header {
+    background: var(--bg-alt);
+}
+
+.pane-header h2 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.pane-toggle {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 2px 6px 2px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.pane-toggle:hover,
+.pane-toggle:focus-visible {
+    color: var(--fg);
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.pane-toggle .chevron {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease;
+}
+
+.pane-toggle[aria-expanded="false"] .chevron {
+    transform: rotate(-90deg);
+}
+.pane-filter {
+    margin: 0 12px 6px;
+    font: inherit;
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+.pane-body {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0 6px 8px;
+}
+
+.pane-group {
+    padding: 8px 6px 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.branch-item {
+    display: block;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.branch-item:hover,
+.branch-item:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.branch-item.selected {
+    background: var(--bg-selected);
+}
+
+/* A folder of branches, from the parts of their names ("claude/..."). Its chevron opens and closes it. */
+.branch-folder {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    width: 100%;
+    padding: 3px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.branch-folder:hover,
+.branch-folder:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.branch-folder .chevron {
+    flex: none;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease;
+}
+
+.branch-folder[aria-expanded="false"] .chevron {
+    transform: rotate(-90deg);
+}
+
+.branch-folder-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    font-weight: 600;
+}
+
+.branch-folder-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.branch-line {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+}
+
+.branch-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.branch-item.current .branch-name {
+    font-weight: 700;
+}
+
+.current-marker {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--head-bg);
+}
+
+.branch-tag {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 10px;
+    line-height: 15px;
+    color: var(--muted);
+}
+
+.branch-tag.ahead {
+    color: var(--added);
+}
+
+.branch-tag.behind,
+.branch-tag.gone {
+    color: var(--deleted);
+}
+
+.branch-subject {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.status-summary {
+    padding: 0 6px 4px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.status-item {
+    display: flex;
+    gap: 8px;
+    padding: 1px 6px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.status-item .status {
+    flex: none;
+    min-width: 14px;
+    font-weight: 700;
+    font-family: ui-monospace, Consolas, monospace;
+}
+
+.status-untracked {
+    color: var(--muted);
+}
+
+.status-conflict {
+    color: var(--deleted);
+}
+.graph-scroll {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.graph {
+    position: relative;
+}
+
+.graph svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    height: var(--row-height);
+    padding-right: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.row:hover {
+    background: var(--bg-hover);
+}
+
+.row.selected {
+    background: var(--bg-selected);
+}
+
+.row.dimmed {
+    opacity: 0.35;
+}
+
+.row .subject {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+
+.row .meta {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+/* The columns after the graph: the description (branch labels and subject), author, date, and commit. The author,
+   date, and commit columns have set widths and stay against the right edge; the description takes the rest, so it's
+   the only column that changes when the pane is resized. app.js sets the widths on the graph pane, and a column
+   dragged to nothing is hidden. */
+.row .column {
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.row .col-description {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+}
+
+
+.row .col-author {
+    width: var(--col-author, 110px);
+}
+
+.row .col-date {
+    width: var(--col-date, 112px);
+}
+
+.row .col-hash {
+    width: var(--col-hash, 64px);
+}
+
+.hide-author .row .col-author,
+.hide-date .row .col-date,
+.hide-hash .row .col-hash {
+    display: none;
+}
+
+/* The labels sit in the Commits title row, each placed over its column by app.js. */
+#graph-pane > .pane-header {
+    position: relative;
+    overflow: hidden;
+}
+
+.column-headers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.column-headers[hidden],
+.pane.collapsed .column-headers {
+    display: none;
+}
+
+.column-header {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.column-header > .column-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The edge in the gap before a label resizes the column to its left. */
+.column-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -8px;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.column-headers:hover .column-resizer::after,
+.column-resizer.dragging::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    bottom: 7px;
+    left: 3px;
+    width: 1px;
+    background: var(--border);
+}
+
+.column-resizer:hover::after,
+.column-resizer.dragging::after {
+    width: 2px;
+    background: var(--remote-fg);
+}
+.row .hash,
+.mono {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+}
+
+.ref {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 17px;
+    font-weight: 600;
+    flex: none;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ref.branch {
+    background: var(--branch-bg);
+    color: var(--branch-fg);
+}
+
+.ref.remote {
+    background: var(--remote-bg);
+    color: var(--remote-fg);
+}
+
+.ref.tag {
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+}
+
+.ref.head {
+    background: var(--head-bg);
+    color: var(--head-fg);
+}
+
+.details {
+    flex: 1;
+    background: var(--bg-alt);
+    overflow: auto;
+    padding: 12px 16px;
+    min-height: 0;
+}
+
+.details h2 {
+    font-size: 15px;
+    margin: 0 0 8px;
+}
+
+.details dl {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 12px;
+    margin: 0 0 12px;
+}
+
+.details dt {
+    color: var(--muted);
+}
+
+.details dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.details pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 0 0 12px;
+    font: 12px/1.45 ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+.details a {
+    color: var(--remote-fg);
+    cursor: pointer;
+}
+
+.hash-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: center;
+}
+
+.copy-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.copy-button:hover,
+.copy-button:focus-visible {
+    color: var(--fg);
+    background: var(--bg-hover);
+    border-color: var(--border);
+}
+
+.copy-button svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.copy-button[data-state="copied"] {
+    color: var(--added);
+}
+
+.copy-button[data-state="failed"] {
+    color: var(--deleted);
+}
+
+.files {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.files li {
+    display: flex;
+    gap: 8px;
+    padding: 2px 0;
+    overflow-wrap: anywhere;
+}
+
+.files .status {
+    flex: none;
+    width: 14px;
+    font-weight: 700;
+    font-family: ui-monospace, Consolas, monospace;
+}
+
+.status-A { color: var(--added); }
+.status-D { color: var(--deleted); }
+.status-M { color: var(--modified); }
+.status-R,
+.status-C { color: var(--renamed); }
+
+.notice {
+    padding: 8px 16px;
+    color: var(--muted);
+}
+
+/* The right-click menu, and the row or branch it's for. */
+.context-menu {
+    position: fixed;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-alt);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.context-menu[hidden] {
+    display: none;
+}
+
+.context-menu-item {
+    padding: 5px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+.context-menu-check {
+    display: inline-block;
+    width: 18px;
+}
+
+.context-menu-separator {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--border);
+}
+
+.row.context-target,
+.branch-item.context-target {
+    outline: 1px solid var(--remote-fg);
+    outline-offset: -1px;
+}
+
+/* Clickable file lists: a commit's changed files and the Status pane's files open their diff. */
+.files .file-item,
+.status-item {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.files .file-item {
+    padding: 2px 4px;
+}
+
+/* The button resets the font, so keep the Status list's smaller text. */
+.status-item {
+    font-size: 12px;
+}
+
+.files .file-item:hover,
+.files .file-item:focus-visible,
+.status-item:hover,
+.status-item:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+/* The diff view covers the Commits pane. */
+#graph-pane {
+    position: relative;
+}
+
+.diff-view {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+.diff-view[hidden] {
+    display: none;
+}
+
+.diff-toolbar {
+    position: relative;
+    display: flex;
+    flex: none;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-alt);
+    white-space: nowrap;
+}
+
+.diff-heading {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: baseline;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.diff-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.diff-source,
+.diff-position {
+    flex: none;
+    font-size: 12px;
+}
+
+.diff-button {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.diff-button:hover:not(:disabled) {
+    background: var(--bg-hover);
+}
+
+.diff-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* The diff's options drop down from its toolbar, like the page's Options menu. */
+.diff-options {
+    right: 8px;
+    width: min(240px, calc(100vw - 24px));
+    white-space: normal;
+}
+
+.diff-main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.diff-body {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* While the ruler is shown, it's the diff's vertical scroll bar, so the code's own vertical scroll bars are hidden.
+   The horizontal ones stay, styled to match. (Browsers without these selectors keep their usual scroll bars.) */
+.diff-main.has-ruler .diff-body::-webkit-scrollbar,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar {
+    width: 0;
+    height: 12px;
+}
+
+.diff-main.has-ruler .diff-body::-webkit-scrollbar-thumb,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background: var(--border) padding-box;
+}
+
+.diff-main.has-ruler .diff-body::-webkit-scrollbar-thumb:hover,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted);
+}
+
+.diff-main.has-ruler .diff-body::-webkit-scrollbar-corner,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* The overview ruler: the whole file from top to bottom, with added lines in green and deleted ones in red (a row
+   that has both, side by side, is split between them), and a thumb over the part that's in view. */
+.diff-ruler {
+    position: relative;
+    flex: none;
+    width: 14px;
+    border-left: 1px solid var(--border);
+    background: var(--bg-alt);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+.diff-ruler[hidden] {
+    display: none;
+}
+
+.diff-ruler-mark {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    min-height: 2px;
+    pointer-events: none;
+}
+
+.diff-ruler-mark.added {
+    background: var(--added);
+}
+
+.diff-ruler-mark.deleted {
+    background: var(--deleted);
+}
+
+.diff-ruler-mark.changed {
+    background: linear-gradient(to right, var(--deleted) 50%, var(--added) 50%);
+}
+
+.diff-ruler-thumb {
+    position: absolute;
+    left: 0;
+    right: 0;
+    min-height: 16px;
+    border: 1px solid var(--muted);
+    border-radius: 3px;
+    background: rgb(128 128 128 / 0.18);
+    cursor: grab;
+}
+
+.diff-ruler-thumb:hover,
+.diff-ruler.dragging .diff-ruler-thumb {
+    background: rgb(128 128 128 / 0.32);
+}
+
+.diff-ruler.dragging,
+.diff-ruler.dragging .diff-ruler-thumb {
+    cursor: grabbing;
+}
+
+.diff-message {
+    padding: 16px;
+    color: var(--muted);
+}
+
+.diff-show-anyway {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+/* The lines are a grid, so the line numbers and code line up and long lines scroll sideways together. */
+.diff-grid {
+    display: grid;
+    /* Every row is one line high, including a side-by-side row that's blank on one side, so the panes line up. */
+    grid-auto-rows: 18px;
+    min-width: 100%;
+    width: max-content;
+    font: 12px/18px ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+.diff-unified {
+    grid-template-columns: auto auto minmax(max-content, 1fr);
+}
+
+/* Side by side: two panes, each scrolling sideways on its own, with a divider that sets the left pane's share. Both
+   always show a horizontal scroll bar, so their rows stay level; only the right pane shows the vertical one. */
+.diff-body.diff-body-split {
+    overflow: hidden;
+}
+
+.diff-split-view {
+    display: flex;
+    height: 100%;
+}
+
+.diff-split-pane {
+    position: relative;
+    min-width: 0;
+    overflow-x: scroll;
+}
+
+.diff-split-left {
+    flex: 0 0 var(--diff-split-left, 50%);
+    overflow-y: hidden;
+}
+
+.diff-split-right {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.diff-split-side {
+    grid-template-columns: auto minmax(max-content, 1fr);
+}
+
+.diff-split-divider {
+    flex: none;
+    width: 1px;
+    margin: 0 -3px;
+    padding: 0 3px;
+    z-index: 1;
+    background: var(--border);
+    background-clip: content-box;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.diff-split-divider:hover,
+.diff-split-divider.dragging {
+    background-color: var(--remote-fg);
+}
+
+.diff-grid > span {
+    white-space: pre;
+}
+
+/* Line numbers stay at the left edge while the code scrolls sideways under them, so they need a solid background:
+   the line's color laid over the page's. */
+.diff-number {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    padding: 0 8px;
+    min-width: 4ch;
+    text-align: right;
+    color: var(--muted);
+    background: var(--bg);
+    box-shadow: inset -1px 0 var(--border);
+    user-select: none;
+}
+
+.diff-number.diff-added {
+    background: linear-gradient(var(--diff-added-bg), var(--diff-added-bg)), var(--bg);
+}
+
+.diff-number.diff-deleted {
+    background: linear-gradient(var(--diff-deleted-bg), var(--diff-deleted-bg)), var(--bg);
+}
+
+.diff-number.diff-empty {
+    background: var(--bg-alt);
+}
+
+/* The unified view's old and new line numbers share one gutter. */
+.diff-gutter {
+    display: flex;
+    gap: 8px;
+}
+
+.diff-gutter-number {
+    min-width: 4ch;
+    text-align: right;
+}
+
+
+.diff-marker {
+    padding: 0 6px;
+    color: var(--muted);
+    user-select: none;
+}
+
+.diff-code {
+    padding-right: 16px;
+}
+
+.diff-added {
+    background: var(--diff-added-bg);
+}
+
+.diff-deleted {
+    background: var(--diff-deleted-bg);
+}
+
+.diff-added .diff-word {
+    border-radius: 2px;
+    background: var(--diff-added-word);
+}
+
+.diff-deleted .diff-word {
+    border-radius: 2px;
+    background: var(--diff-deleted-word);
+}
+
+/* Syntax colors for highlight.js's token scopes. Inner scopes win, since their spans are nested inside. */
+.diff-code .hljs-keyword,
+.diff-code .hljs-doctag,
+.diff-code .hljs-template-tag,
+.diff-code .hljs-template-variable,
+.diff-code .hljs-variable.language_ {
+    color: var(--syntax-keyword);
+}
+
+.diff-code .hljs-string,
+.diff-code .hljs-regexp {
+    color: var(--syntax-string);
+}
+
+.diff-code .hljs-comment,
+.diff-code .hljs-code,
+.diff-code .hljs-formula {
+    color: var(--syntax-comment);
+}
+
+.diff-code .hljs-number,
+.diff-code .hljs-literal,
+.diff-code .hljs-attr,
+.diff-code .hljs-attribute,
+.diff-code .hljs-meta,
+.diff-code .hljs-operator,
+.diff-code .hljs-variable,
+.diff-code .hljs-selector-attr,
+.diff-code .hljs-selector-class,
+.diff-code .hljs-selector-id,
+.diff-code .hljs-section {
+    color: var(--syntax-constant);
+}
+
+.diff-code .hljs-title,
+.diff-code .hljs-title.function_ {
+    color: var(--syntax-function);
+}
+
+.diff-code .hljs-type,
+.diff-code .hljs-title.class_,
+.diff-code .hljs-built_in,
+.diff-code .hljs-symbol,
+.diff-code .hljs-bullet {
+    color: var(--syntax-type);
+}
+
+.diff-code .hljs-name,
+.diff-code .hljs-quote,
+.diff-code .hljs-selector-tag,
+.diff-code .hljs-selector-pseudo {
+    color: var(--syntax-tag);
+}
+
+.diff-code .hljs-subst,
+.diff-code .hljs-params {
+    color: var(--fg);
+}
+
+.diff-code .hljs-meta .hljs-keyword {
+    color: var(--syntax-keyword);
+}
+
+.diff-code .hljs-meta .hljs-string {
+    color: var(--syntax-string);
+}
+
+.diff-code .hljs-section,
+.diff-code .hljs-strong {
+    font-weight: 600;
+}
+
+.diff-code .hljs-emphasis {
+    font-style: italic;
+}
+
+.diff-empty {
+    background: var(--bg-alt);
+}
+
+.diff-gap {
+    grid-column: 1 / -1;
+    padding-left: 12px;
+    color: var(--muted);
+    background: var(--bg-alt);
+}
