@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-    Installs the GitWatcher PowerShell module, which adds the Start-GitWatcher command.
+    Installs the GitWatcher PowerShell module (Start-GitWatcher) and the /git-watcher Claude Code skill.
 
 .DESCRIPTION
-    Adds a GitWatcher module to your PowerShell modules folder (Documents\PowerShell\Modules). The module points
-    back at this clone, so Start-GitWatcher always runs this clone's current code: pulling updates is enough, and
-    there's no need to install again unless you move the clone.
+    Adds a GitWatcher module to your PowerShell modules folder (Documents\PowerShell\Modules), and a git-watcher
+    skill to your Claude Code skills folder (~/.claude/skills, or CLAUDE_CONFIG_DIR\skills). Both point back at
+    this clone, so they always run this clone's current code. Install again after you move the clone, or after an
+    update changes the skill.
 #>
 [CmdletBinding()]
 param()
@@ -34,3 +35,13 @@ New-ModuleManifest -Path $manifest `
 
 Import-Module $manifest -Force
 Write-Host "Installed the $moduleName module in '$destinationPath'. Run Start-GitWatcher in any repository."
+
+# The Claude Code skill is a template with this clone's server path filled in, installed for the user so that
+# /git-watcher works in every repository.
+$claudeDirectory = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+$skillDirectory = [IO.Path]::Combine($claudeDirectory, 'skills', 'git-watcher')
+$null = New-Item -Path $skillDirectory -ItemType Directory -Force
+$serverPath = (Join-Path $PSScriptRoot 'GitWatcher.Server\server.js').Replace('\', '/')
+$skill = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'GitWatcher.Skill\SKILL.md') -Raw).Replace('{{ServerPath}}', $serverPath)
+[IO.File]::WriteAllText((Join-Path $skillDirectory 'SKILL.md'), $skill, [Text.UTF8Encoding]::new($false))
+Write-Host "Installed the git-watcher Claude Code skill in '$skillDirectory'. Type /git-watcher in Claude Code to open the viewer."

@@ -17,7 +17,7 @@ Windows Terminal.
 
 ## Install
 
-Clone the repository and install the `GitWatcher` PowerShell module:
+Clone the repository and run the installer:
 
 ```powershell
 git clone https://github.com/WestRyanK/GitWatcher.git
@@ -25,8 +25,13 @@ cd GitWatcher
 ./Install.ps1
 ```
 
-`Install.ps1` adds the module to `Documents\PowerShell\Modules`. The module points back at your clone, so pulling
-updates is enough; install again only if you move the clone.
+`Install.ps1` installs two things, both pointing back at your clone, so they run its current code:
+
+* The `GitWatcher` PowerShell module, with the `Start-GitWatcher` command, in `Documents\PowerShell\Modules`.
+* The `/git-watcher` Claude Code skill, in `~/.claude/skills` (or `CLAUDE_CONFIG_DIR\skills`), so you can open the
+  viewer from Claude Code in any repository.
+
+Run it again after you move the clone, or after an update changes the skill.
 
 ## Running it
 
@@ -38,8 +43,8 @@ From PowerShell in Windows Terminal (or a classic console window), in any folder
 Start-GitWatcher
 ```
 
-Pass `-Path` to show a different repository. In Windows Terminal, this splits the current tab: a new pane on the right reserves room for the viewer, and the
-panel sits exactly over that pane. Your shell's pane gets narrower, so its text wraps before the panel instead of
+Pass `-Path` to show a different repository. In Windows Terminal, this splits the current tab: a new pane on the
+right reserves room for the viewer, and the panel sits exactly over that pane. Your shell's pane gets narrower, so its text wraps before the panel instead of
 going under it. The panel follows the window when you move or resize it, hides when you minimize the window or
 switch to another tab, and closes (with its pane) when you close the window or exit the shell. It works with the tab
 row hidden too (quake mode, focus mode, or full screen).
@@ -71,12 +76,13 @@ different repository.
 
 ### In Claude Code
 
-Type `/git-watcher` (or ask Claude to open Git Watcher or the git graph). In the desktop app it opens the viewer in
-the Browser pane. In the terminal it starts the server and gives you the URL. The skill is in
-[`.claude/skills/git-watcher`](.claude/skills/git-watcher/SKILL.md).
+After installing, type `/git-watcher` in any repository (or ask Claude to open Git Watcher or the git graph). It
+reuses a viewer that's already running for that repository, or starts one on a free port from 4173 to 4182. In the
+desktop app it opens the viewer in the Browser pane. In the terminal it gives you the URL. It never adds files to
+the repository. The skill's template is [`GitWatcher.Skill/SKILL.md`](GitWatcher.Skill/SKILL.md).
 
-You can also start **git-watcher** from the desktop app's Browser pane **Dev servers** menu. The entry is in
-[`.claude/launch.json`](.claude/launch.json).
+In this repository, you can also start **git-watcher** from the desktop app's Browser pane **Dev servers** menu.
+The entry is in [`.claude/launch.json`](.claude/launch.json).
 
 ## Using it
 
@@ -136,7 +142,9 @@ Git Watcher never changes your repository. Its menus copy commands for you to ru
 * [`GitWatcher.Server`](GitWatcher.Server) holds the Node server (`server.js`) and the page it serves (`public/`).
 * [`GitWatcher.Overlay`](GitWatcher.Overlay) is the WPF app for the Windows Terminal panel.
 * [`GitWatcher.psm1`](GitWatcher.psm1) is the PowerShell module with `Start-GitWatcher`, which builds the panel when
-  needed and starts it. [`Install.ps1`](Install.ps1) installs the module.
+  needed and starts it. [`Install.ps1`](Install.ps1) installs the module and the
+  Claude Code skill.
+* [`GitWatcher.Skill`](GitWatcher.Skill) holds the `/git-watcher` skill's template.
 
 ### The server and page
 
