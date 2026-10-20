@@ -1,21 +1,21 @@
-# Git Graph
+# Git Watcher
 
 A small, read-only web viewer for this repository's commit graph. It shows branches, remote branches, tags, merges,
 and HEAD, and updates while you work. Click a commit to see its full message, author, date, and changed files.
 
 ## Running it
 
-In Claude Code, type `/git-graph` (or ask Claude to open the git graph). In the desktop app it opens the viewer in
+In Claude Code, type `/git-watcher` (or ask Claude to open Git Watcher or the git graph). In the desktop app it opens the viewer in
 the Browser pane. In the terminal it starts the server and gives you the URL. The skill is in
-[`.claude/skills/git-graph`](../.claude/skills/git-graph/SKILL.md).
+[`.claude/skills/git-watcher`](../.claude/skills/git-watcher/SKILL.md).
 
-You can also start **git-graph** from the desktop app's Browser pane **Dev servers** menu. The entry is in
+You can also start **git-watcher** from the desktop app's Browser pane **Dev servers** menu. The entry is in
 [`.claude/launch.json`](../.claude/launch.json).
 
 From a terminal:
 
 ```powershell
-node GitGraph/server.js
+node GitWatcher/server.js
 ```
 
 Then open <http://localhost:4173>. Set `PORT` to use a different port. Pass a path as the first argument to view a
@@ -26,7 +26,7 @@ different repository.
 From PowerShell in Windows Terminal (or a classic console window), run:
 
 ```powershell
-.\GitGraph\Show-GitGraph.ps1
+.\GitWatcher\Show-GitWatcher.ps1
 ```
 
 In Windows Terminal, this splits the current tab: a new pane on the right reserves room for the viewer, and the
@@ -40,18 +40,18 @@ row hidden too (quake mode, focus mode, or full screen).
 * **Minimize:** the panel's minimize button closes the pane, so your shell gets its full width back, and leaves a
   small button in the terminal's top-right corner. Click it to split the pane again and reopen the panel. Closing the
   pane yourself does the same as minimizing. The viewer keeps running while it's minimized, so it reopens instantly.
-* The width and the minimized state are saved in `~/.git-graph/overlay.json`.
+* The width and the minimized state are saved in `~/.git-watcher/overlay.json`.
 
 In a classic console window, which has no panes, the panel covers the right side of the window instead, below any
 title bar. Drag its left edge to change the width (double-click the edge to reset it).
 
-To open the panel by typing `gg`, add an alias to your PowerShell profile:
+To open the panel by typing `gw`, add an alias to your PowerShell profile:
 
 ```powershell
-Set-Alias gg D:\source\GitHub\GitWatcher\GitGraph\Show-GitGraph.ps1
+Set-Alias gw D:\source\GitHub\GitWatcher\GitWatcher\Show-GitWatcher.ps1
 ```
 
-The panel is `GitGraph.Overlay`, a small WPF app. `Show-GitGraph.ps1` builds it on first use, and again whenever
+The panel is `GitWatcher.Overlay`, a small WPF app. `Show-GitWatcher.ps1` builds it on first use, and again whenever
 its sources change. An open panel locks the program, so after an update the script starts the current version and
 asks you to close every panel. The next run then rebuilds it. It needs the .NET 10 SDK, Node.js, and the WebView2
 runtime, which comes with Windows 11. How it works:
@@ -117,9 +117,9 @@ runtime, which comes with Windows 11. How it works:
   date.
 * The page remembers its state: **Commits from**, **Show**, **Live**, both filters, the selected commit, the open
   nodes and folders in the branch tree, pane sizes, and collapsed panes. `GET /api/settings` and `PUT /api/settings`
-  read and save them in a per-user file, `~/.git-graph/settings.json` (set `GIT_GRAPH_SETTINGS` to use another path), so
+  read and save them in a per-user file, `~/.git-watcher/settings.json` (set `GIT_WATCHER_SETTINGS` to use another path), so
   they survive restarts, port changes, and cleared browser data, and every worktree shares them. The server only accepts
-  a save that comes from the viewer page itself: it must be JSON from the same origin, holding `git-graph.*` string
+  a save that comes from the viewer page itself: it must be JSON from the same origin, holding `git-watcher.*` string
   values.
 * Click a file in **Commit details** or in the **Status** pane to see its diff, in a view over the Commits pane:
   - A commit's file is compared with the commit's first parent. A Status file is compared by its group: staged

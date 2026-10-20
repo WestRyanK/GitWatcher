@@ -1,4 +1,4 @@
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// Calculates where the overlay goes: along the right side of the terminal, below its top inset.

@@ -3,14 +3,14 @@ using System.Windows;
 using System.Windows.Media;
 using Microsoft.Win32;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
-/// Docks the git graph viewer to the right side of the terminal window that started it.
+/// Docks Git Watcher to the right side of the terminal window that started it.
 /// </summary>
 public partial class App : Application
 {
-    private GitGraphServer? _server;
+    private GitWatcherServer? _server;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -42,7 +42,7 @@ public partial class App : Application
 
         try
         {
-            _server = await GitGraphServer.StartAsync(options.ServerScript, options.RepositoryPath);
+            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath);
             window.ShowViewer(_server.Address);
         }
         catch (Exception exception)
@@ -120,7 +120,7 @@ public partial class App : Application
 
     private void ShowStartupError(string message)
     {
-        MessageBox.Show(message, "Git Graph", MessageBoxButton.OK, MessageBoxImage.Error);
+        MessageBox.Show(message, "Git Watcher", MessageBoxButton.OK, MessageBoxImage.Error);
         Shutdown(1);
     }
 }

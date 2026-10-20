@@ -1,10 +1,10 @@
-<Window x:Class="GitGraph.Overlay.MainWindow"
+<Window x:Class="GitWatcher.Overlay.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Width="480"
         Height="640"
-        Title="Git Graph"
+        Title="Git Watcher"
         Background="{DynamicResource OverlayBackground}"
         ResizeMode="NoResize"
         ShowActivated="False"
@@ -89,16 +89,16 @@
                                FontSize="11"
                                FontWeight="Bold"
                                Foreground="{DynamicResource OverlayMutedForeground}"
-                               Text="GIT GRAPH" />
+                               Text="GIT WATCHER" />
                     <Button Grid.Column="1"
                             Content="&#xE921;"
-                            AutomationProperties.Name="Minimize git graph"
+                            AutomationProperties.Name="Minimize Git Watcher"
                             Click="OnMinimizeClick"
                             Style="{StaticResource HeaderButtonStyle}"
                             ToolTip="Minimize to a button" />
                     <Button Grid.Column="2"
                             Content="&#xE8BB;"
-                            AutomationProperties.Name="Close git graph"
+                            AutomationProperties.Name="Close Git Watcher"
                             Click="OnCloseClick"
                             Style="{StaticResource HeaderButtonStyle}"
                             ToolTip="Close" />
@@ -108,7 +108,7 @@
                            Grid.Row="1"
                            Margin="16"
                            Foreground="{DynamicResource OverlayForeground}"
-                           Text="Starting the git graph server…"
+                           Text="Starting the Git Watcher server…"
                            TextWrapping="Wrap" />
                 <wv2:WebView2 x:Name="Viewer"
                               Grid.Row="1"
@@ -118,10 +118,10 @@
 
         <Button x:Name="CollapsedButton"
                 Visibility="Collapsed"
-                AutomationProperties.Name="Show git graph"
+                AutomationProperties.Name="Show Git Watcher"
                 Click="OnRestoreClick"
                 Style="{StaticResource CollapsedButtonStyle}"
-                ToolTip="Show the git graph">
+                ToolTip="Show Git Watcher">
             <!-- A small commit graph: two commits on one line and a branch merging into it. -->
             <Path Width="16"
                   Height="16"

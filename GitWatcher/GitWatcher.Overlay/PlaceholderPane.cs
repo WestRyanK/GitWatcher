@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// An empty Windows Terminal pane, split off the right side of the current tab, that reserves room for the overlay.
@@ -56,10 +56,10 @@ internal sealed class PlaceholderPane : IDisposable
     {
         int processId = Environment.ProcessId;
         int splitNumber = Interlocked.Increment(ref s_splitCount);
-        string name = $"GitGraph.Overlay.{processId}.{splitNumber}";
+        string name = $"GitWatcher.Overlay.{processId}.{splitNumber}";
         string closeSignalName = $@"Local\{name}.Close";
         string aliveSignalName = $@"Local\{name}.Alive";
-        string title = $"Git Graph {processId}-{splitNumber}";
+        string title = $"Git Watcher {processId}-{splitNumber}";
 
         // Each split gets its own signals. A signal that's already set can't be reused, because a new pane would
         // see it and close at once.

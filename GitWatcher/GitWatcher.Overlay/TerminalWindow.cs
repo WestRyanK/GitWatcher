@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// The terminal window the overlay docks to, and how to find it.

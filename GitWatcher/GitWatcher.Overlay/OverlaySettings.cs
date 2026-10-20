@@ -1,10 +1,10 @@
 using System.IO;
 using System.Text.Json;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
-/// The overlay's own settings, saved next to the viewer's settings in ~/.git-graph.
+/// The overlay's own settings, saved next to the viewer's settings in ~/.git-watcher.
 /// </summary>
 internal sealed class OverlaySettings
 {
@@ -12,7 +12,7 @@ internal sealed class OverlaySettings
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".git-graph",
+        ".git-watcher",
         "overlay.json");
 
     /// <summary>The overlay's width as a fraction of the terminal's width.</summary>

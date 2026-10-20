@@ -2,8 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "git-graph",
-      "program": "GitGraph/server.js",
+      "name": "git-watcher",
+      "program": "GitWatcher/server.js",
       "port": 4173,
       "autoPort": true
     }

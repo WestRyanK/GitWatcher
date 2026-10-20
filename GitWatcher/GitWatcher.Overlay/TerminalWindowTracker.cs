@@ -1,4 +1,4 @@
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// Raises events when the terminal window moves, resizes, is restored, or is destroyed.

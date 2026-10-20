@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.IO;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// Command-line options:
@@ -48,7 +48,7 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
         }
 
         serverScript ??= FindServerScript()
-            ?? throw new ArgumentException("Couldn't find GitGraph/server.js. Pass its path with --server.");
+            ?? throw new ArgumentException("Couldn't find GitWatcher/server.js. Pass its path with --server.");
         if (!File.Exists(serverScript))
         {
             throw new ArgumentException($"The server script {serverScript} doesn't exist.");
@@ -70,7 +70,7 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
         return (nint)handle;
     }
 
-    // The program is built under GitGraph/GitGraph.Overlay/bin, so server.js is in a parent folder.
+    // The program is built under GitWatcher/GitWatcher.Overlay/bin, so server.js is in a parent folder.
     private static string? FindServerScript()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

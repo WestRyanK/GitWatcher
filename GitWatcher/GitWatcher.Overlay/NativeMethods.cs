@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// The Win32 functions the overlay uses to find, follow, and dock to the terminal window.

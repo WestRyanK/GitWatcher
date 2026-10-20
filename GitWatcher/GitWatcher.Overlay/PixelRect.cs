@@ -1,4 +1,4 @@
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// A screen rectangle in physical pixels.

@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Docks the live git graph viewer to the right side of the current terminal window.
+    Docks Git Watcher, the live git graph viewer, to the right side of the current terminal window.
 
 .DESCRIPTION
-    Starts GitGraph.Overlay, a small WPF app that shows the git graph viewer (GitGraph) for a repository in
+    Starts GitWatcher.Overlay, a small WPF app that shows Git Watcher for a repository in
     a panel docked to the right side of the terminal window you run this from. In Windows Terminal it splits the
     current tab and covers the new pane, so your shell's text wraps before the panel. The panel follows the window
     when you move or resize it, hides when you minimize it or switch tabs, and closes when you close the window or
@@ -16,14 +16,14 @@
     The folder whose repository to show. Defaults to the current directory.
 
 .EXAMPLE
-    .\GitGraph\Show-GitGraph.ps1
+    .\GitWatcher\Show-GitWatcher.ps1
 
     Shows the current directory's repository next to this terminal.
 
 .EXAMPLE
-    Set-Alias gg D:\source\GitHub\GitWatcher\GitGraph\Show-GitGraph.ps1
+    Set-Alias gw D:\source\GitHub\GitWatcher\GitWatcher\Show-GitWatcher.ps1
 
-    Add this to your PowerShell profile to open the overlay by typing gg.
+    Add this to your PowerShell profile to open the overlay by typing gw.
 #>
 [CmdletBinding()]
 param(
@@ -32,9 +32,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$projectDirectory = Join-Path $PSScriptRoot 'GitGraph.Overlay'
-$project = Join-Path $projectDirectory 'GitGraph.Overlay.csproj'
-$executable = Join-Path $projectDirectory 'bin\Release\net10.0-windows\GitGraph.Overlay.exe'
+$projectDirectory = Join-Path $PSScriptRoot 'GitWatcher.Overlay'
+$project = Join-Path $projectDirectory 'GitWatcher.Overlay.csproj'
+$executable = Join-Path $projectDirectory 'bin\Release\net10.0-windows\GitWatcher.Overlay.exe'
 
 # Build when the app is missing or any of its sources is newer than it.
 $sources = Get-ChildItem $projectDirectory -File -Recurse -Include *.cs, *.xaml, *.csproj, *.manifest |
@@ -46,18 +46,18 @@ if (-not $needsBuild) {
 }
 
 # An open overlay locks its program file, so it can't be rebuilt until every overlay is closed.
-$running = Get-Process -Name GitGraph.Overlay -ErrorAction SilentlyContinue |
+$running = Get-Process -Name GitWatcher.Overlay -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -eq (Resolve-Path -LiteralPath $executable -ErrorAction SilentlyContinue).ProviderPath }
 if ($needsBuild -and $running) {
-    Write-Warning 'The git graph overlay has changed, but an open overlay is using it. Close all overlays to update it. Starting the current version.'
+    Write-Warning 'The Git Watcher overlay has changed, but an open overlay is using it. Close all overlays to update it. Starting the current version.'
     $needsBuild = $false
 }
 
 if ($needsBuild) {
-    Write-Host 'Building the git graph overlay...'
+    Write-Host 'Building the Git Watcher overlay...'
     dotnet build $project --configuration Release --nologo --verbosity quiet
     if ($LASTEXITCODE -ne 0) {
-        throw 'The git graph overlay failed to build.'
+        throw 'The Git Watcher overlay failed to build.'
     }
 }
 

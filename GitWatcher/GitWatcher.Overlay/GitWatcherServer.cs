@@ -5,13 +5,13 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
-/// Runs the git graph viewer's Node server (GitGraph/server.js) for one repository, on a free port, for as
+/// Runs Git Watcher's Node server (GitWatcher/server.js) for one repository, on a free port, for as
 /// long as the overlay is open.
 /// </summary>
-internal sealed class GitGraphServer : IDisposable
+internal sealed class GitWatcherServer : IDisposable
 {
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan StartupPollInterval = TimeSpan.FromMilliseconds(150);
@@ -19,7 +19,7 @@ internal sealed class GitGraphServer : IDisposable
     private readonly Process _process;
     private readonly StringBuilder _output = new();
 
-    private GitGraphServer(Process process, Uri address)
+    private GitWatcherServer(Process process, Uri address)
     {
         _process = process;
         Address = address;
@@ -27,7 +27,7 @@ internal sealed class GitGraphServer : IDisposable
 
     public Uri Address { get; }
 
-    public static async Task<GitGraphServer> StartAsync(string serverScript, string repositoryPath)
+    public static async Task<GitWatcherServer> StartAsync(string serverScript, string repositoryPath)
     {
         int port = FindFreePort();
         ProcessStartInfo startInfo = new("node")
@@ -43,7 +43,7 @@ internal sealed class GitGraphServer : IDisposable
         startInfo.Environment["PORT"] = port.ToString();
 
         // The server exits by itself if this process goes away without stopping it, for example after a crash.
-        startInfo.Environment["GIT_GRAPH_PARENT_PID"] = Environment.ProcessId.ToString();
+        startInfo.Environment["GIT_WATCHER_PARENT_PID"] = Environment.ProcessId.ToString();
 
         Process process;
         try
@@ -56,7 +56,7 @@ internal sealed class GitGraphServer : IDisposable
         }
 
         // The server listens on 127.0.0.1 only.
-        GitGraphServer server = new(process, new Uri($"http://127.0.0.1:{port}/"));
+        GitWatcherServer server = new(process, new Uri($"http://127.0.0.1:{port}/"));
         process.OutputDataReceived += server.OnOutput;
         process.ErrorDataReceived += server.OnOutput;
         process.BeginOutputReadLine();
@@ -115,7 +115,7 @@ internal sealed class GitGraphServer : IDisposable
         {
             if (_process.HasExited)
             {
-                throw new InvalidOperationException($"The git graph server stopped while starting.\n{GetOutput()}");
+                throw new InvalidOperationException($"The Git Watcher server stopped while starting.\n{GetOutput()}");
             }
 
             try
@@ -138,7 +138,7 @@ internal sealed class GitGraphServer : IDisposable
             await Task.Delay(StartupPollInterval);
         }
 
-        throw new TimeoutException($"The git graph server didn't start within {StartupTimeout.TotalSeconds} seconds.\n{GetOutput()}");
+        throw new TimeoutException($"The Git Watcher server didn't start within {StartupTimeout.TotalSeconds} seconds.\n{GetOutput()}");
     }
 
     private void OnOutput(object sender, DataReceivedEventArgs e)

@@ -1,9 +1,9 @@
-// Read-only live git graph viewer. No npm dependencies.
+// Git Watcher: a read-only, live git graph viewer. No npm dependencies.
 //
-// Usage: node GitGraph/server.js [repoPath]
+// Usage: node GitWatcher/server.js [repoPath]
 // Port comes from the PORT environment variable (default 4173).
 // The repository defaults to the one containing the current working directory.
-// The page's settings are saved per user in ~/.git-graph/settings.json (or GIT_GRAPH_SETTINGS), never in the repo.
+// The page's settings are saved per user in ~/.git-watcher/settings.json (or GIT_WATCHER_SETTINGS), never in the repo.
 
 'use strict';
 
@@ -18,9 +18,9 @@ const port = Number(process.env.PORT) || 4173;
 const host = '127.0.0.1';
 const publicDir = path.join(__dirname, 'public');
 const maxCommitLimit = 20000;
-const settingsPath = process.env.GIT_GRAPH_SETTINGS || path.join(os.homedir(), '.git-graph', 'settings.json');
+const settingsPath = process.env.GIT_WATCHER_SETTINGS || path.join(os.homedir(), '.git-watcher', 'settings.json');
 const maxSettingsBytes = 64 * 1024;
-const settingKeyPattern = /^git-graph\.[\w.-]{1,100}$/;
+const settingKeyPattern = /^git-watcher.[\w.-]{1,100}$/;
 
 // Only these git subcommands are ever run. All of them are read-only. `status` normally refreshes the index,
 // but GIT_OPTIONAL_LOCKS=0 (set in runGit) stops it from writing. `ls-remote` is only run with `--get-url`, which
@@ -414,7 +414,7 @@ async function readSettings() {
     }
 }
 
-// Accepts only a flat object of "git-graph.*" keys with short string values.
+// Accepts only a flat object of "git-watcher.*" keys with short string values.
 function validateSettings(settings) {
     if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
         return false;
@@ -556,7 +556,7 @@ const server = http.createServer(async (request, response) => {
             }
             const settings = JSON.parse(await readRequestBody(request));
             if (!validateSettings(settings)) {
-                sendJson(response, 400, { error: 'Settings must be an object of git-graph.* string values.' });
+                sendJson(response, 400, { error: 'Settings must be an object of git-watcher.* string values.' });
                 return;
             }
             await writeSettings(settings);
@@ -642,9 +642,9 @@ const server = http.createServer(async (request, response) => {
     }
 });
 
-// When another program runs this server for itself (the Windows Terminal overlay sets GIT_GRAPH_PARENT_PID), exit
+// When another program runs this server for itself (the Windows Terminal overlay sets GIT_WATCHER_PARENT_PID), exit
 // once that program is gone, so a crash never leaves the server running.
-const parentProcessId = Number(process.env.GIT_GRAPH_PARENT_PID) || null;
+const parentProcessId = Number(process.env.GIT_WATCHER_PARENT_PID) || null;
 if (parentProcessId) {
     setInterval(() => {
         try {
@@ -659,5 +659,5 @@ if (parentProcessId) {
 }
 
 server.listen(port, host, () => {
-    console.log(`git-graph: serving ${repoRoot} at http://localhost:${port}`);
+    console.log(`git-watcher: serving ${repoRoot} at http://localhost:${port}`);
 });

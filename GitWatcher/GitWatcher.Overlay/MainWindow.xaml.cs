@@ -7,7 +7,7 @@ using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// A borderless window, owned by the terminal window, that stays docked to the terminal's right side.
@@ -81,7 +81,7 @@ public partial class MainWindow : Window
         {
             UserDataFolder = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "GitGraph.Overlay",
+                "GitWatcher.Overlay",
                 "WebView2"),
         };
         Viewer.CoreWebView2InitializationCompleted += OnViewerInitializationCompleted;

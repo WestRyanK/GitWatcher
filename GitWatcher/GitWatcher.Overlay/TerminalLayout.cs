@@ -1,4 +1,4 @@
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// What UI Automation reports about a terminal window's panes.

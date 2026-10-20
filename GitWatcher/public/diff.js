@@ -286,7 +286,7 @@ function renderSideBySide(lines) {
     return { element: view, scroller: rightPane };
 }
 
-const diffSplitSettingKey = 'git-graph.diff-split';
+const diffSplitSettingKey = 'git-watcher.diff-split';
 const diffSplitDefault = 50;
 
 function setDiffSplit(view, percent) {
@@ -486,7 +486,7 @@ function setDiffLayout(sideBySide, save) {
     diffElements.unified.setAttribute('aria-pressed', String(!sideBySide));
     diffElements.sideBySide.setAttribute('aria-pressed', String(sideBySide));
     if (save) {
-        writeSetting('git-graph.diff-side-by-side', sideBySide ? 'true' : null);
+        writeSetting('git-watcher.diff-side-by-side', sideBySide ? 'true' : null);
     }
     if (isDiffOpen() && diffState.result) {
         renderDiff();
@@ -502,8 +502,8 @@ function stepDiff(step) {
 }
 
 function loadDiffSettings() {
-    setDiffLayout(readSetting('git-graph.diff-side-by-side') === 'true', false);
-    diffElements.ignoreWhitespace.checked = readSetting('git-graph.diff-ignore-whitespace') === 'true';
+    setDiffLayout(readSetting('git-watcher.diff-side-by-side') === 'true', false);
+    diffElements.ignoreWhitespace.checked = readSetting('git-watcher.diff-ignore-whitespace') === 'true';
 }
 
 diffElements.previous.addEventListener('click', () => stepDiff(-1));
@@ -512,7 +512,7 @@ diffElements.close.addEventListener('click', closeDiff);
 diffElements.unified.addEventListener('click', () => setDiffLayout(false, true));
 diffElements.sideBySide.addEventListener('click', () => setDiffLayout(true, true));
 diffElements.ignoreWhitespace.addEventListener('change', () => {
-    writeSetting('git-graph.diff-ignore-whitespace', diffElements.ignoreWhitespace.checked ? 'true' : null);
+    writeSetting('git-watcher.diff-ignore-whitespace', diffElements.ignoreWhitespace.checked ? 'true' : null);
     loadDiff();
 });
 

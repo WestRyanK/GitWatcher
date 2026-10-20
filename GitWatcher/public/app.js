@@ -266,7 +266,7 @@ function render(data) {
     elements.graphScroll.scrollTop = scrollTop;
 
     elements.repoName.textContent = data.repo;
-    document.title = `Git Graph · ${data.repo}`;
+    document.title = `Git Watcher · ${data.repo}`;
     const headLabel = data.head.branch ? data.head.branch : `detached at ${(data.head.hash || '').slice(0, 8)}`;
     const shown = data.total !== null && data.commits.length < data.total
         ? `${data.commits.length.toLocaleString()} of ${data.total.toLocaleString()} commits`
@@ -487,14 +487,14 @@ function renderDetails(details) {
 }
 
 const settingKeys = {
-    scope: 'git-graph.scope',
-    limit: 'git-graph.limit',
-    autoRefresh: 'git-graph.auto-refresh',
-    commitFilter: 'git-graph.commit-filter',
-    branchFilter: 'git-graph.branch-filter',
-    selectedCommit: 'git-graph.selected-commit',
-    collapsedPrefix: 'git-graph.collapsed.',
-    tagGrouping: 'git-graph.tag-grouping',
+    scope: 'git-watcher.scope',
+    limit: 'git-watcher.limit',
+    autoRefresh: 'git-watcher.auto-refresh',
+    commitFilter: 'git-watcher.commit-filter',
+    branchFilter: 'git-watcher.branch-filter',
+    selectedCommit: 'git-watcher.selected-commit',
+    collapsedPrefix: 'git-watcher.collapsed.',
+    tagGrouping: 'git-watcher.tag-grouping',
 };
 const keyboardResizeStep = 24;
 const settingsSaveDelayMs = 300;
@@ -540,7 +540,7 @@ function readLegacySettings() {
     try {
         for (let index = 0; index < localStorage.length; index++) {
             const key = localStorage.key(index);
-            if (key.startsWith('git-graph.')) {
+            if (key.startsWith('git-watcher.')) {
                 legacy[key] = localStorage.getItem(key);
             }
         }
@@ -585,7 +585,7 @@ const splitters = [
         paneIsBefore: false,
         horizontal: true,
         variable: '--details-height',
-        storageKey: 'git-graph.details-height',
+        storageKey: 'git-watcher.details-height',
         minimum: 120,
     },
     {
@@ -595,7 +595,7 @@ const splitters = [
         paneIsBefore: true,
         horizontal: false,
         variable: '--sidebar-width',
-        storageKey: 'git-graph.sidebar-width',
+        storageKey: 'git-watcher.sidebar-width',
         minimum: 180,
     },
     {
@@ -605,7 +605,7 @@ const splitters = [
         paneIsBefore: true,
         horizontal: true,
         variable: '--branches-height',
-        storageKey: 'git-graph.branches-height',
+        storageKey: 'git-watcher.branches-height',
         minimum: 80,
     },
 ];
@@ -725,8 +725,8 @@ function setPaneCollapsed(paneId, collapsed) {
 
 function loadLayoutSettings() {
     // Earlier versions had a Remote checkbox; the Remote branches node replaced it.
-    if (readSetting('git-graph.show-remote-branches') !== null) {
-        writeSetting('git-graph.show-remote-branches', null);
+    if (readSetting('git-watcher.show-remote-branches') !== null) {
+        writeSetting('git-watcher.show-remote-branches', null);
     }
 
     // Earlier versions collapsed the Branches and Status panes together as the whole sidebar.
@@ -841,12 +841,12 @@ function setTagGrouping(grouping) {
 
 // The Remote branches and Tags nodes are closed by default, unlike the branch folders, so each has its own setting.
 const closedByDefaultNodes = {
-    remote: 'git-graph.remote-branches-open',
-    tags: 'git-graph.tags-open',
+    remote: 'git-watcher.remote-branches-open',
+    tags: 'git-watcher.tags-open',
 };
 
 // Branch folders collapsed by the user, by path ("local:claude", "remote:origin/claude"). Folders are open by default.
-const branchFolderSettingKey = 'git-graph.collapsed-branch-folders';
+const branchFolderSettingKey = 'git-watcher.collapsed-branch-folders';
 let collapsedBranchFolders = null;
 
 function getCollapsedBranchFolders() {
@@ -1433,8 +1433,8 @@ function setColumnWidth(column, width) {
 }
 
 function saveColumnWidth(column) {
-    writeSetting(`git-graph.column-${column}`, String(columnWidths[column]));
-    writeSetting(`git-graph.column-${column}-restore`, String(columnRestoreWidths[column] ?? columnDefaults[column]));
+    writeSetting(`git-watcher.column-${column}`, String(columnWidths[column]));
+    writeSetting(`git-watcher.column-${column}-restore`, String(columnRestoreWidths[column] ?? columnDefaults[column]));
 }
 
 // Shows a hidden column at the width it had, or hides a column, giving its space to the subjects.
@@ -1446,15 +1446,15 @@ function setColumnVisible(column, visible) {
 // Without saved widths, a narrow window (such as the Windows Terminal overlay) starts without the author and date.
 function loadColumnWidths() {
     // Earlier versions saved a width for the description; it now always takes the space that's left.
-    if (readSetting('git-graph.column-description') !== null) {
-        writeSetting('git-graph.column-description', null);
+    if (readSetting('git-watcher.column-description') !== null) {
+        writeSetting('git-watcher.column-description', null);
     }
 
     const narrow = window.innerWidth < 760;
     for (const column of Object.keys(columnDefaults)) {
-        const restore = Number.parseInt(readSetting(`git-graph.column-${column}-restore`) || '', 10);
+        const restore = Number.parseInt(readSetting(`git-watcher.column-${column}-restore`) || '', 10);
         columnRestoreWidths[column] = Number.isFinite(restore) && restore >= columnMinimumWidth ? restore : columnDefaults[column];
-        const saved = Number.parseInt(readSetting(`git-graph.column-${column}`) || '', 10);
+        const saved = Number.parseInt(readSetting(`git-watcher.column-${column}`) || '', 10);
         const fallback = narrow && column !== 'hash' ? 0 : columnDefaults[column];
         setColumnWidth(column, Number.isFinite(saved) ? saved : fallback);
     }
@@ -1535,8 +1535,8 @@ for (const header of elements.columnHeaders.querySelectorAll('.column-header')) 
     resizer.addEventListener('dblclick', () => {
         const reset = column === 'description' ? 'hash' : column;
         setColumnWidth(reset, columnDefaults[reset]);
-        writeSetting(`git-graph.column-${reset}`, null);
-        writeSetting(`git-graph.column-${reset}-restore`, null);
+        writeSetting(`git-watcher.column-${reset}`, null);
+        writeSetting(`git-watcher.column-${reset}-restore`, null);
     });
 }
 for (const checkbox of elements.columnToggles) {

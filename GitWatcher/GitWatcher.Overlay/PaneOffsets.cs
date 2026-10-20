@@ -1,4 +1,4 @@
-namespace GitGraph.Overlay;
+namespace GitWatcher.Overlay;
 
 /// <summary>
 /// Where a pane sits inside the terminal's client area, so the overlay can follow the pane while the window moves
