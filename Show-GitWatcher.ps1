@@ -16,12 +16,12 @@
     The folder whose repository to show. Defaults to the current directory.
 
 .EXAMPLE
-    .\GitWatcher\Show-GitWatcher.ps1
+    .\Show-GitWatcher.ps1
 
     Shows the current directory's repository next to this terminal.
 
 .EXAMPLE
-    Set-Alias gw D:\source\GitHub\GitWatcher\GitWatcher\Show-GitWatcher.ps1
+    Set-Alias gw D:\source\GitHub\GitWatcher\Show-GitWatcher.ps1
 
     Add this to your PowerShell profile to open the overlay by typing gw.
 #>

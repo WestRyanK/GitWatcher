@@ -8,7 +8,7 @@ using System.Text;
 namespace GitWatcher.Overlay;
 
 /// <summary>
-/// Runs Git Watcher's Node server (GitWatcher/server.js) for one repository, on a free port, for as
+/// Runs Git Watcher's Node server (GitWatcher.Server/server.js) for one repository, on a free port, for as
 /// long as the overlay is open.
 /// </summary>
 internal sealed class GitWatcherServer : IDisposable

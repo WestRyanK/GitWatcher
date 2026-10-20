@@ -1,6 +1,6 @@
 // Git Watcher: a read-only, live git graph viewer. No npm dependencies.
 //
-// Usage: node GitWatcher/server.js [repoPath]
+// Usage: node GitWatcher.Server/server.js [repoPath]
 // Port comes from the PORT environment variable (default 4173).
 // The repository defaults to the one containing the current working directory.
 // The page's settings are saved per user in ~/.git-watcher/settings.json (or GIT_WATCHER_SETTINGS), never in the repo.

@@ -48,7 +48,7 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
         }
 
         serverScript ??= FindServerScript()
-            ?? throw new ArgumentException("Couldn't find GitWatcher/server.js. Pass its path with --server.");
+            ?? throw new ArgumentException("Couldn't find GitWatcher.Server/server.js. Pass its path with --server.");
         if (!File.Exists(serverScript))
         {
             throw new ArgumentException($"The server script {serverScript} doesn't exist.");
@@ -70,14 +70,16 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
         return (nint)handle;
     }
 
-    // The program is built under GitWatcher/GitWatcher.Overlay/bin, so server.js is in a parent folder.
+    // The program is built under GitWatcher.Overlay/bin, so server.js is in the GitWatcher.Server folder next to a
+    // parent folder.
     private static string? FindServerScript()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            string candidate = Path.Combine(directory.FullName, "server.js");
-            if (File.Exists(candidate) && Directory.Exists(Path.Combine(directory.FullName, "public")))
+            string serverDirectory = Path.Combine(directory.FullName, "GitWatcher.Server");
+            string candidate = Path.Combine(serverDirectory, "server.js");
+            if (File.Exists(candidate) && Directory.Exists(Path.Combine(serverDirectory, "public")))
             {
                 return candidate;
             }

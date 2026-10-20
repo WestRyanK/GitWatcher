@@ -25,7 +25,7 @@ If the Browser pane's preview tools are available (`preview_start`):
    ```json
    {
      "name": "git-watcher",
-     "program": "GitWatcher/server.js",
+     "program": "GitWatcher.Server/server.js",
      "port": 4173,
      "autoPort": true
    }
@@ -39,7 +39,7 @@ If the Browser pane's preview tools are available (`preview_start`):
 1. Check whether the viewer is already running: request `http://localhost:4173/api/version`. If it answers, give
    the user that URL and stop.
 2. Otherwise start it in the background from the repository root (or worktree root) with
-   `node GitWatcher/server.js`. The server reads `PORT` (default 4173) and shows the repository it's started
+   `node GitWatcher.Server/server.js`. The server reads `PORT` (default 4173) and shows the repository it's started
    in.
 3. Give the user the URL, `http://localhost:4173`, to open in their browser, and mention that the server keeps
    running in the background until they stop it.

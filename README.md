@@ -22,7 +22,7 @@ Windows Terminal.
 From PowerShell in Windows Terminal (or a classic console window), run:
 
 ```powershell
-.\GitWatcher\Show-GitWatcher.ps1
+.\Show-GitWatcher.ps1
 ```
 
 In Windows Terminal, this splits the current tab: a new pane on the right reserves room for the viewer, and the
@@ -44,13 +44,13 @@ title bar. Drag its left edge to change the width (double-click the edge to rese
 To open the panel by typing `gw`, add an alias to your PowerShell profile, using the path of your clone:
 
 ```powershell
-Set-Alias gw D:\source\GitHub\GitWatcher\GitWatcher\Show-GitWatcher.ps1
+Set-Alias gw D:\source\GitHub\GitWatcher\Show-GitWatcher.ps1
 ```
 
 ### In a browser
 
 ```powershell
-node GitWatcher/server.js
+node GitWatcher.Server/server.js
 ```
 
 Then open <http://localhost:4173>. Set `PORT` to use a different port. Pass a path as the first argument to view a
@@ -120,7 +120,13 @@ Git Watcher never changes your repository. Its menus copy commands for you to ru
 
 ## How it works
 
+* [`GitWatcher.Server`](GitWatcher.Server) holds the Node server (`server.js`) and the page it serves (`public/`).
+* [`GitWatcher.Overlay`](GitWatcher.Overlay) is the WPF app for the Windows Terminal panel.
+* [`Show-GitWatcher.ps1`](Show-GitWatcher.ps1) builds the panel when needed and starts it.
+
 ### The server and page
+
+The page is plain HTML, JavaScript, and SVG in `GitWatcher.Server/public`.
 
 * `GET /api/graph?scope=S&limit=N` returns commits from `git log --topo-order`, plus refs and HEAD.
   `public/app.js` lays the commits out in lanes and draws the graph as plain SVG.

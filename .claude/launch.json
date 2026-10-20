@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "git-watcher",
-      "program": "GitWatcher/server.js",
+      "program": "GitWatcher.Server/server.js",
       "port": 4173,
       "autoPort": true
     }
