@@ -154,9 +154,14 @@ body.repo-missing .workspace {
     opacity: 0.45;
 }
 
+/* A long message (a git error) is cut short instead of pushing the buttons off the edge; hovering shows all of it. */
 .status-text {
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 50%;
+    overflow: hidden;
     font-size: 12px;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
