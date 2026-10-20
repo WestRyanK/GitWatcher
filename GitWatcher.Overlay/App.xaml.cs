@@ -28,6 +28,10 @@ public partial class App : Application
             return;
         }
 
+        // The repository's path is resolved now, so leave it: Windows won't delete or rename a folder that a running
+        // process has as its current directory.
+        Environment.CurrentDirectory = AppContext.BaseDirectory;
+
         TerminalWindow? terminal = TerminalWindow.Find(options.TerminalWindow);
         if (terminal is null)
         {
