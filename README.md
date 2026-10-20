@@ -8,6 +8,8 @@ uncommitted changes. It updates on its own as the repository changes, so you don
 It runs as a small local web server with a page you can open in any browser, or docked beside your shell in
 Windows Terminal.
 
+![Git Watcher docked beside PowerShell in Windows Terminal, showing the commit graph with its Author, Date, and Commit columns](docs/screenshots/graph.png)
+
 ## Prerequisites
 
 * **Git** and **Node.js** (any current version). The server uses only Node's built-in modules, so there's nothing
@@ -136,6 +138,36 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
 * **Settings:** the page remembers its state (the options, filters, selected commit, open tree nodes, pane sizes,
   and columns) in a per-user file, `~/.git-watcher/settings.json` (set `GIT_WATCHER_SETTINGS` to use another path).
   They survive restarts, port changes, and cleared browser data, and every repository and worktree shares them.
+
+## Screenshots
+
+### Branches
+
+The **Branches** pane, with local branches in folders, remote branches, and tags.
+
+![The Branches pane open beside the commit graph](docs/screenshots/branches.png)
+
+### Status
+
+The **Status** pane, with staged, unstaged, and untracked files.
+
+![The Status pane open beside the commit graph](docs/screenshots/status.png)
+
+### Commit details
+
+![The Commit details pane showing a commit's message and changed files](docs/screenshots/commit-details.png)
+
+### Diff
+
+A unified diff with deleted and added lines, changed-word highlights, syntax colors, and the overview scroll bar.
+
+![The diff view showing deleted and added lines](docs/screenshots/diff.png)
+
+### Options
+
+The **Options** menu, with the commits filtered by "git".
+
+![The Options menu with the commit filter set to git](docs/screenshots/options.png)
 
 ## Read-only by design
 
