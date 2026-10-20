@@ -468,6 +468,95 @@ function attachSplitDivider(view, divider) {
         writeSetting(diffSplitSettingKey, null);
     });
 }
+// The rows of the shown layout, top to bottom, each with whether it shows a deleted line, an added line, or both
+// (side by side, where a run of changes pairs its deleted and added lines in rows).
+function overviewRows(lines, sideBySide) {
+    if (!sideBySide) {
+        return lines.map((line) => ({ deleted: line.type === 'deleted', added: line.type === 'added' }));
+    }
+    const rows = [];
+    let index = 0;
+    while (index < lines.length) {
+        if (lines[index].type === 'gap' || lines[index].type === 'context') {
+            rows.push({ deleted: false, added: false });
+            index++;
+            continue;
+        }
+        let deletedCount = 0;
+        let addedCount = 0;
+        while (index < lines.length && lines[index].type === 'deleted') {
+            deletedCount++;
+            index++;
+        }
+        while (index < lines.length && lines[index].type === 'added') {
+            addedCount++;
+            index++;
+        }
+        for (let row = 0; row < Math.max(deletedCount, addedCount); row++) {
+            rows.push({ deleted: row < deletedCount, added: row < addedCount });
+        }
+    }
+    return rows;
+}
+
+// Overview ruler: the diff's vertical scroll bar, as in Azure DevOps. It shows the whole file, marks each run of
+// added (green) and deleted (red) rows where it is, and has a thumb over the part that's in view. Click it to center
+// that spot, drag the thumb to scroll, or use the mouse wheel over it.
+const rulerMinimumThumb = 16;
+
+function showRuler(scroller, rows) {
+    diffState.scroller = scroller;
+    const marks = document.createDocumentFragment();
+    let start = 0;
+    for (let index = 1; index <= rows.length; index++) {
+        const run = rows[start];
+        if (index < rows.length && rows[index].deleted === run.deleted && rows[index].added === run.added) {
+            continue;
+        }
+        if (run.deleted || run.added) {
+            const mark = document.createElement('div');
+            mark.className = `diff-ruler-mark ${run.deleted && run.added ? 'changed' : run.deleted ? 'deleted' : 'added'}`;
+            mark.style.top = `${(start / rows.length) * 100}%`;
+            mark.style.height = `${((index - start) / rows.length) * 100}%`;
+            marks.appendChild(mark);
+        }
+        start = index;
+    }
+    const thumb = document.createElement('div');
+    thumb.className = 'diff-ruler-thumb';
+    diffElements.ruler.replaceChildren(marks, thumb);
+    diffElements.ruler.hidden = false;
+    diffElements.main.classList.add('has-ruler');
+    updateRuler();
+}
+
+function hideRuler() {
+    diffState.scroller = null;
+    diffElements.ruler.hidden = true;
+    diffElements.ruler.replaceChildren();
+    diffElements.main.classList.remove('has-ruler');
+}
+
+// The thumb's top and height in the ruler, in pixels, for the scroller's position.
+function rulerThumbBounds() {
+    const { scrollTop, scrollHeight, clientHeight } = diffState.scroller;
+    const rulerHeight = diffElements.ruler.clientHeight;
+    const height = Math.min(rulerHeight, Math.max(rulerMinimumThumb, (clientHeight / scrollHeight) * rulerHeight));
+    const top = Math.min(rulerHeight - height, (scrollTop / scrollHeight) * rulerHeight);
+    return { top, height, rulerHeight };
+}
+
+function updateRuler() {
+    const thumb = diffElements.ruler.querySelector('.diff-ruler-thumb');
+    if (!diffState.scroller || !thumb) {
+        return;
+    }
+    const { top, height } = rulerThumbBounds();
+    thumb.hidden = diffState.scroller.scrollHeight <= diffState.scroller.clientHeight;
+    thumb.style.top = `${top}px`;
+    thumb.style.height = `${height}px`;
+}
+
 const diffState = {
     files: [],
     index: 0,
@@ -475,11 +564,15 @@ const diffState = {
     request: 0,
     expandedGraphPane: false,
     showLargeDiff: false,
+    // The element that scrolls the shown diff vertically, while the ruler is shown.
+    scroller: null,
 };
 
 const diffElements = {
     view: document.getElementById('diff-view'),
+    main: document.querySelector('.diff-main'),
     body: document.getElementById('diff-body'),
+    ruler: document.getElementById('diff-ruler'),
     title: document.getElementById('diff-title'),
     source: document.getElementById('diff-source'),
     position: document.getElementById('diff-position'),
@@ -516,6 +609,7 @@ function openDiff(source, files, index) {
 function closeDiff() {
     diffElements.view.hidden = true;
     diffElements.body.replaceChildren();
+    hideRuler();
     if (diffState.expandedGraphPane) {
         setPaneCollapsed('graph-pane', true);
         diffState.expandedGraphPane = false;
@@ -542,6 +636,7 @@ async function loadDiff() {
     diffElements.previous.disabled = diffState.index === 0;
     diffElements.next.disabled = diffState.index === diffState.files.length - 1;
     diffElements.body.replaceChildren(createElement('p', 'diff-message', 'Loading…'));
+    hideRuler();
 
     const query = new URLSearchParams({ path: file.path });
     if (file.oldPath) {
@@ -571,6 +666,7 @@ async function loadDiff() {
 
 function renderDiff() {
     const result = diffState.result;
+    hideRuler();
     if (result.tooLarge) {
         diffElements.body.replaceChildren(createElement('p', 'diff-message',
             `This file is too large to show (${Math.round(result.size / 1024 / 1024)} MB).`));
@@ -614,12 +710,14 @@ function renderDiff() {
     diffElements.body.classList.toggle('diff-body-split', sideBySide);
     diffElements.body.replaceChildren(rendered.element);
     diffElements.body.scrollTop = 0;
+    showRuler(rendered.scroller, overviewRows(parsed.lines, sideBySide));
 
     // Start at the first change, since the whole file is shown.
     const firstChange = rendered.element.querySelector('.diff-added, .diff-deleted');
     if (firstChange) {
         rendered.scroller.scrollTop = Math.max(0, firstChange.offsetTop - rendered.scroller.clientHeight / 3);
     }
+    updateRuler();
 }
 
 function setDiffLayout(sideBySide, save) {
@@ -656,6 +754,52 @@ diffElements.ignoreWhitespace.addEventListener('change', () => {
     writeSetting('git-watcher.diff-ignore-whitespace', diffElements.ignoreWhitespace.checked ? 'true' : null);
     loadDiff();
 });
+// Scroll events don't bubble, but the capture phase sees the side-by-side pane's as well as the body's own.
+diffElements.body.addEventListener('scroll', updateRuler, { capture: true, passive: true });
+new ResizeObserver(updateRuler).observe(diffElements.body);
+
+diffElements.ruler.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !diffState.scroller) {
+        return;
+    }
+    event.preventDefault();
+    const scroller = diffState.scroller;
+    const ruler = diffElements.ruler;
+    const rulerTop = () => ruler.getBoundingClientRect().top;
+    const scrollToThumbTop = (thumbTop) => {
+        scroller.scrollTop = (thumbTop / ruler.clientHeight) * scroller.scrollHeight;
+    };
+
+    // Grabbing the thumb keeps the spot under the pointer. Clicking elsewhere centers that spot, then drags from there.
+    let { top, height } = rulerThumbBounds();
+    let grabOffset = event.clientY - rulerTop() - top;
+    if (!event.target.classList.contains('diff-ruler-thumb')) {
+        grabOffset = height / 2;
+        scrollToThumbTop(event.clientY - rulerTop() - grabOffset);
+    }
+
+    ruler.setPointerCapture(event.pointerId);
+    ruler.classList.add('dragging');
+    const onMove = (moveEvent) => {
+        scrollToThumbTop(moveEvent.clientY - rulerTop() - grabOffset);
+    };
+    const onEnd = () => {
+        ruler.removeEventListener('pointermove', onMove);
+        ruler.removeEventListener('pointerup', onEnd);
+        ruler.removeEventListener('pointercancel', onEnd);
+        ruler.classList.remove('dragging');
+    };
+    ruler.addEventListener('pointermove', onMove);
+    ruler.addEventListener('pointerup', onEnd);
+    ruler.addEventListener('pointercancel', onEnd);
+});
+
+diffElements.ruler.addEventListener('wheel', (event) => {
+    if (diffState.scroller && event.deltaY !== 0) {
+        diffState.scroller.scrollTop += event.deltaY;
+    }
+}, { passive: true });
+
 diffElements.syntax.addEventListener('change', () => {
     writeSetting('git-watcher.diff-syntax', diffElements.syntax.checked ? null : 'false');
     if (isDiffOpen() && diffState.result) {

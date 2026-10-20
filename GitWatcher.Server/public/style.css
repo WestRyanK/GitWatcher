@@ -1202,10 +1202,100 @@ body.resizing.resizing-rows {
     font-size: 12px;
 }
 
-.diff-body {
+.diff-main {
+    display: flex;
     flex: 1;
     min-height: 0;
+}
+
+.diff-body {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
     overflow: auto;
+}
+
+/* While the ruler is shown, it's the diff's vertical scroll bar, so the code's own vertical scroll bars are hidden.
+   The horizontal ones stay, styled to match. (Browsers without these selectors keep their usual scroll bars.) */
+.diff-main.has-ruler .diff-body::-webkit-scrollbar,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar {
+    width: 0;
+    height: 12px;
+}
+
+.diff-main.has-ruler .diff-body::-webkit-scrollbar-thumb,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background: var(--border) padding-box;
+}
+
+.diff-main.has-ruler .diff-body::-webkit-scrollbar-thumb:hover,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted);
+}
+
+.diff-main.has-ruler .diff-body::-webkit-scrollbar-corner,
+.diff-main.has-ruler .diff-split-pane::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* The overview ruler: the whole file from top to bottom, with added lines in green and deleted ones in red (a row
+   that has both, side by side, is split between them), and a thumb over the part that's in view. */
+.diff-ruler {
+    position: relative;
+    flex: none;
+    width: 14px;
+    border-left: 1px solid var(--border);
+    background: var(--bg-alt);
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+.diff-ruler[hidden] {
+    display: none;
+}
+
+.diff-ruler-mark {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    min-height: 2px;
+    pointer-events: none;
+}
+
+.diff-ruler-mark.added {
+    background: var(--added);
+}
+
+.diff-ruler-mark.deleted {
+    background: var(--deleted);
+}
+
+.diff-ruler-mark.changed {
+    background: linear-gradient(to right, var(--deleted) 50%, var(--added) 50%);
+}
+
+.diff-ruler-thumb {
+    position: absolute;
+    left: 0;
+    right: 0;
+    min-height: 16px;
+    border: 1px solid var(--muted);
+    border-radius: 3px;
+    background: rgb(128 128 128 / 0.18);
+    cursor: grab;
+}
+
+.diff-ruler-thumb:hover,
+.diff-ruler.dragging .diff-ruler-thumb {
+    background: rgb(128 128 128 / 0.32);
+}
+
+.diff-ruler.dragging,
+.diff-ruler.dragging .diff-ruler-thumb {
+    cursor: grabbing;
 }
 
 .diff-message {

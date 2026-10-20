@@ -187,7 +187,12 @@
                         <button id="diff-close" class="diff-button" type="button" title="Close (Esc)"
                             aria-label="Close the diff">✕</button>
                     </div>
-                    <div id="diff-body" class="diff-body"></div>
+                    <div class="diff-main">
+                        <div id="diff-body" class="diff-body"></div>
+                        <!-- The diff's vertical scroll bar, which also marks the changes. diff.js draws it. -->
+                        <div id="diff-ruler" class="diff-ruler" title="Changes in this file. Click or drag to scroll."
+                            hidden></div>
+                    </div>
                 </section>
             </section>
             <div id="splitter" class="splitter" role="separator" tabindex="0" aria-controls="details-pane"

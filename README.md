@@ -115,6 +115,9 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
   - The whole file is shown, scrolled to the first change, with the changed words highlighted. Choose **Unified**
     or **Side by side**, and **Ignore whitespace** to hide whitespace-only changes. Side by side scrolls the two
     panes together; drag the divider between them to resize them.
+  - The diff's vertical scroll bar is an overview of the whole file, as in Azure DevOps and Visual Studio: added
+    lines are marked in green and deleted ones in red (side by side, a row with both is half of each), and a thumb
+    shows the part in view. Click it to jump to that spot, drag the thumb, or scroll the wheel over it.
   - **Syntax colors** colors the code by its language, chosen from the file's extension. Each side of the file is
     colored as a whole, so comments and strings that span lines come out right, and the changed-word highlights
     sit on top. Files over 10,000 lines or 500 KB are shown without colors. The choice is remembered.
