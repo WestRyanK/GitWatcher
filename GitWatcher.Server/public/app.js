@@ -5,9 +5,20 @@ const laneWidth = 14;
 const graphPadding = 10;
 const nodeRadius = 4;
 const pollIntervalMs = 3000;
+// Cool colors only, so a branch never looks like an error or a warning. They alternate between the blue-violet and
+// green-teal families so that neighbors in the list (lanes next to each other) never look alike, including where the
+// list wraps around, and all of them read on both the light and dark themes. The first is the main line's.
 const laneColors = [
-    '#0969da', '#1a7f37', '#cf222e', '#8250df', '#bf8700',
-    '#1b7c83', '#d1242f', '#6639ba', '#953800', '#57606a',
+    '#2f81f7', // blue
+    '#b04fc9', // orchid
+    '#1f9d8b', // teal
+    '#5a67d8', // indigo
+    '#2da44e', // green
+    '#a78bfa', // lavender
+    '#0aa2c0', // cyan
+    '#8957e5', // violet
+    '#6e7f96', // slate
+    '#0f766e', // pine
 ];
 
 const elements = {
