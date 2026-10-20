@@ -206,25 +206,22 @@ function computeLayout(commits, { mainLine, merged }) {
         let previous = -1;
         commit.parents.forEach((parent, index) => {
             let target;
-            if (index === 0 && column === 0 && mainLine.has(parent)) {
-                // The main line carries on down lane 0, even if another lane already leads to this parent.
-                target = 0;
+            if (index === 0) {
+                // The branch carries on down its own lane, even if another lane already leads to the first parent, so
+                // where it forks off another branch it joins at the fork commit rather than partway down a line.
+                target = column;
             } else {
                 // Later parents go right of the one before, in a second lane if the parent's lane is to the left.
                 target = lanes.findIndex((lane, at) => at > previous && canUse(lane, parent));
                 if (target === -1) {
-                    target = index === 0 && lanes[column] === null
-                        ? column
-                        : newLane(Math.max(previous + 1, firstFreeLane));
+                    target = newLane(Math.max(previous + 1, firstFreeLane));
                 }
             }
             if (lanes[target] === null) {
-                lanes[target] = { hash: parent, merged: isMerged, color: index === 0 && target === column ? color : newColor(target) };
+                lanes[target] = { hash: parent, merged: isMerged, color: index === 0 ? color : newColor(target) };
             }
             previous = target;
-            // The line to the first parent is this commit's branch carrying on, so it keeps the commit's color even
-            // when it joins another lane. Lines to later parents are the merged branches, in their own colors.
-            parentLanes.push({ lane: lanes[target], color: index === 0 ? color : lanes[target].color });
+            parentLanes.push(lanes[target]);
         });
 
         // Lanes are matched up by identity, since an inserted lane can move the ones to its right.
@@ -239,8 +236,8 @@ function computeLayout(commits, { mainLine, merged }) {
                 segments.push({ kind: 'through', from: index, to: lanes.indexOf(lane), color: lane.color });
             }
         });
-        for (const { lane, color: lineColor } of parentLanes) {
-            segments.push({ kind: 'out', from: column, to: lanes.indexOf(lane), color: lineColor });
+        for (const lane of parentLanes) {
+            segments.push({ kind: 'out', from: column, to: lanes.indexOf(lane), color: lane.color });
         }
 
         while (lanes.length > 0 && lanes[lanes.length - 1] === null) {
