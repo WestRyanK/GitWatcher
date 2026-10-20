@@ -169,6 +169,13 @@ The **Options** menu, with the commits filtered by "git".
 
 ![The Options menu with the commit filter set to git](docs/screenshots/options.png)
 
+### Minimized
+
+The panel minimized, which gives the shell the window's full width. Click the button in the top-right corner to open
+the panel again.
+
+![The terminal with the Git Watcher panel minimized to a button in its top-right corner](docs/screenshots/minimized.png)
+
 ## Read-only by design
 
 Git Watcher never changes your repository. Its menus copy commands for you to run instead of running them.
