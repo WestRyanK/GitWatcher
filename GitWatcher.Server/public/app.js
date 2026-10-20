@@ -290,6 +290,7 @@ function applyFilter() {
 
 function setStatus(text) {
     elements.status.textContent = text;
+    elements.status.title = text;
 }
 
 // Shows the banner for a missing repository with the server's explanation, or hides it when message is null.
