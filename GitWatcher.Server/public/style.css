@@ -115,6 +115,45 @@ body {
     min-width: 0;
 }
 
+/* Shown under the toolbar while the repository's folder is missing; the panes below it are left over and dimmed. */
+.repo-banner {
+    display: flex;
+    flex: none;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--deleted);
+    background: var(--diff-deleted-bg);
+    color: var(--fg);
+}
+
+.repo-banner[hidden] {
+    display: none;
+}
+
+.repo-banner svg {
+    flex: none;
+    margin-top: 1px;
+    fill: none;
+    stroke: var(--deleted);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.repo-banner strong {
+    color: var(--deleted);
+}
+
+.repo-banner p {
+    margin: 2px 0 0;
+    overflow-wrap: anywhere;
+}
+
+body.repo-missing .workspace {
+    opacity: 0.45;
+}
+
 .status-text {
     flex: none;
     font-size: 12px;

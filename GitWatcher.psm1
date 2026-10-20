@@ -77,7 +77,7 @@ function Start-GitWatcher {
     # the shell's process ID closes the overlay when this shell (or its tab) closes.
     Start-Process -FilePath $executable `
         -ArgumentList "--repo `"$repositoryPath`" --shell-process $PID" `
-        -WorkingDirectory $repositoryPath
+        -WorkingDirectory (Split-Path $executable)
 }
 
 Export-ModuleMember -Function Start-GitWatcher

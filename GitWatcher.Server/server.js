@@ -40,7 +40,11 @@ const scopeRevisions = {
 const fieldSeparator = '\x1f';
 const recordSeparator = '\x1e';
 
-let repoRoot = process.argv[2] || process.cwd();
+let repoRoot = path.resolve(process.argv[2] || process.cwd());
+
+// Windows won't delete or rename a folder that a running process has as its current directory, so the server
+// doesn't stay in the repository. Git still runs there, but only for as long as each command takes.
+process.chdir(__dirname);
 
 function runGit(args) {
     if (!allowedGitCommands.has(args[0])) {
@@ -67,6 +71,19 @@ function runGit(args) {
                 resolve(stdout);
             });
     });
+}
+
+// Says why the repository's folder can't be read (deleted, renamed, or moved), or returns null when it's there. Git
+// can't even start without its working folder, so its own error would only say "spawn git ENOENT".
+async function getRepoProblem() {
+    try {
+        if ((await fs.promises.stat(repoRoot)).isDirectory()) {
+            return null;
+        }
+        return `${repoRoot} is no longer a folder.`;
+    } catch {
+        return `The folder ${repoRoot} was deleted, renamed, or moved.`;
+    }
 }
 
 async function runGitOrNull(args) {
@@ -577,6 +594,14 @@ const server = http.createServer(async (request, response) => {
             return;
         }
 
+        if (url.pathname.startsWith('/api/')) {
+            const repoProblem = await getRepoProblem();
+            if (repoProblem) {
+                sendJson(response, 503, { error: repoProblem, repoMissing: true, repoPath: repoRoot });
+                return;
+            }
+        }
+
         if (url.pathname === '/api/version') {
             sendJson(response, 200, await getVersion());
             return;
@@ -641,6 +666,15 @@ const server = http.createServer(async (request, response) => {
 
         sendJson(response, 404, { error: 'Not found' });
     } catch (error) {
+        // The .git folder can go away while the repository's folder stays.
+        if (/not a git repository/i.test(error.message)) {
+            sendJson(response, 503, {
+                error: `${repoRoot} is no longer a git repository.`,
+                repoMissing: true,
+                repoPath: repoRoot,
+            });
+            return;
+        }
         sendJson(response, 500, { error: error.message });
     }
 });

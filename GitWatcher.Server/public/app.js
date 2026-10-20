@@ -35,6 +35,8 @@ const elements = {
     autoRefresh: document.getElementById('auto-refresh'),
     refresh: document.getElementById('refresh'),
     status: document.getElementById('status'),
+    repoBanner: document.getElementById('repo-banner'),
+    repoBannerMessage: document.getElementById('repo-banner-message'),
     optionsToggle: document.getElementById('options-toggle'),
     options: document.getElementById('options'),
 
@@ -290,11 +292,21 @@ function setStatus(text) {
     elements.status.textContent = text;
 }
 
+// Shows the banner for a missing repository with the server's explanation, or hides it when message is null.
+function setRepoProblem(message) {
+    elements.repoBanner.hidden = message === null;
+    elements.repoBannerMessage.textContent = message ?? '';
+    document.body.classList.toggle('repo-missing', message !== null);
+}
+
 async function fetchJson(url) {
     const response = await fetch(url, { cache: 'no-store' });
     const body = await response.json();
     if (!response.ok) {
-        throw new Error(body.error || `HTTP ${response.status}`);
+        if (body.repoMissing) {
+            setRepoProblem(body.error);
+        }
+        throw Object.assign(new Error(body.error || `HTTP ${response.status}`), { repoMissing: Boolean(body.repoMissing) });
     }
     return body;
 }
@@ -307,13 +319,14 @@ async function loadGraph() {
     setStatus('Loading…');
     try {
         const data = await fetchJson(`/api/graph?scope=${elements.scope.value}&limit=${elements.limit.value}`);
+        setRepoProblem(null);
         state.data = data;
         state.fingerprint = data.fingerprint;
         render(data);
         loadBranches();
         setStatus(`Updated ${new Date().toLocaleTimeString()}`);
     } catch (error) {
-        setStatus(`Error: ${error.message}`);
+        setStatus(error.repoMissing ? 'Repository not found' : `Error: ${error.message}`);
     } finally {
         state.loading = false;
     }
@@ -328,9 +341,13 @@ async function poll() {
         const { fingerprint } = await fetchJson('/api/version');
         if (fingerprint !== state.fingerprint) {
             await loadGraph();
+        } else if (!elements.repoBanner.hidden) {
+            // The repository came back unchanged, as after renaming its folder back.
+            setRepoProblem(null);
+            setStatus(`Updated ${new Date().toLocaleTimeString()}`);
         }
     } catch (error) {
-        setStatus(`Error: ${error.message}`);
+        setStatus(error.repoMissing ? 'Repository not found' : `Error: ${error.message}`);
     }
 }
 

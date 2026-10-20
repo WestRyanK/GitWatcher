@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -32,7 +33,8 @@ internal sealed class GitWatcherServer : IDisposable
         int port = FindFreePort();
         ProcessStartInfo startInfo = new("node")
         {
-            WorkingDirectory = repositoryPath,
+            // Not the repository: Windows won't delete or rename a running process's current directory.
+            WorkingDirectory = Path.GetDirectoryName(serverScript)!,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
