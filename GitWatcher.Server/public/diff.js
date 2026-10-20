@@ -1,7 +1,7 @@
 'use strict';
 
 // Diff view: shows one file's changes, from a commit or the working tree, over the Commits pane. The whole file is
-// shown, in a unified or side-by-side layout, with the changed words highlighted. It only reads.
+// shown, unified, side by side, or as only the old or new file, with the changed words highlighted. It only reads.
 
 const diffLineLimit = 20000;
 const wordDiffTokenLimit = 400;
@@ -355,6 +355,27 @@ function renderUnified(lines) {
     return grid;
 }
 
+// Old file only, or new file only: that side's lines, with its deleted or added lines and changed words
+// highlighted, and its own line numbers.
+function sideLines(lines, side) {
+    const changeType = side === 'old' ? 'deleted' : 'added';
+    return lines.filter((line) => line.type === 'context' || line.type === 'gap' || line.type === changeType);
+}
+
+function renderSingleSide(lines, side) {
+    const grid = createDiffCell('diff-grid diff-split-side');
+    for (const line of sideLines(lines, side)) {
+        if (line.type === 'gap') {
+            grid.appendChild(createDiffCell('diff-gap', '⋯'));
+            continue;
+        }
+        const lineClass = lineClasses[line.type];
+        grid.appendChild(createDiffCell(`diff-number ${lineClass}`, side === 'old' ? line.oldNumber : line.newNumber));
+        grid.appendChild(createCodeCell(line, lineClass, side));
+    }
+    return grid;
+}
+
 // Side by side: the old file on the left and the new file on the right, each in its own pane that scrolls sideways
 // on its own, with a divider between them that can be dragged. A run of changes lines up its deleted and added
 // lines, leaving blanks where one side has more. Lines don't wrap, so the rows of the two panes always line up, and
@@ -470,8 +491,11 @@ function attachSplitDivider(view, divider) {
 }
 // The rows of the shown layout, top to bottom, each with whether it shows a deleted line, an added line, or both
 // (side by side, where a run of changes pairs its deleted and added lines in rows).
-function overviewRows(lines, sideBySide) {
-    if (!sideBySide) {
+function overviewRows(lines, layout) {
+    if (layout === 'old' || layout === 'new') {
+        lines = sideLines(lines, layout);
+    }
+    if (layout !== 'side-by-side') {
         return lines.map((line) => ({ deleted: line.type === 'deleted', added: line.type === 'added' }));
     }
     const rows = [];
@@ -578,8 +602,9 @@ const diffElements = {
     position: document.getElementById('diff-position'),
     previous: document.getElementById('diff-previous'),
     next: document.getElementById('diff-next'),
-    unified: document.getElementById('diff-unified'),
-    sideBySide: document.getElementById('diff-side-by-side'),
+    optionsToggle: document.getElementById('diff-options-toggle'),
+    options: document.getElementById('diff-options'),
+    layout: document.getElementById('diff-layout'),
     ignoreWhitespace: document.getElementById('diff-ignore-whitespace'),
     syntax: document.getElementById('diff-syntax'),
     close: document.getElementById('diff-close'),
@@ -610,6 +635,7 @@ function closeDiff() {
     diffElements.view.hidden = true;
     diffElements.body.replaceChildren();
     hideRuler();
+    setDiffOptionsOpen(false);
     if (diffState.expandedGraphPane) {
         setPaneCollapsed('graph-pane', true);
         diffState.expandedGraphPane = false;
@@ -703,14 +729,28 @@ function renderDiff() {
         addSyntaxHighlights(parsed.lines, diffState.files[diffState.index].path);
     }
 
-    const sideBySide = diffElements.sideBySide.getAttribute('aria-pressed') === 'true';
-    const rendered = sideBySide
-        ? renderSideBySide(parsed.lines)
-        : { element: renderUnified(parsed.lines), scroller: diffElements.body };
+    const layout = diffElements.layout.value;
+    const sideBySide = layout === 'side-by-side';
     diffElements.body.classList.toggle('diff-body-split', sideBySide);
+    if ((layout === 'old' || layout === 'new') && sideLines(parsed.lines, layout).length === 0) {
+        const message = layout === 'old'
+            ? 'This file is new, so it has no old version. Choose another layout in the diff options to see it.'
+            : 'This file was deleted, so it has no new version. Choose another layout in the diff options to see it.';
+        diffElements.body.replaceChildren(createElement('p', 'diff-message', message));
+        return;
+    }
+
+    let rendered;
+    if (sideBySide) {
+        rendered = renderSideBySide(parsed.lines);
+    } else if (layout === 'old' || layout === 'new') {
+        rendered = { element: renderSingleSide(parsed.lines, layout), scroller: diffElements.body };
+    } else {
+        rendered = { element: renderUnified(parsed.lines), scroller: diffElements.body };
+    }
     diffElements.body.replaceChildren(rendered.element);
     diffElements.body.scrollTop = 0;
-    showRuler(rendered.scroller, overviewRows(parsed.lines, sideBySide));
+    showRuler(rendered.scroller, overviewRows(parsed.lines, layout));
 
     // Start at the first change, since the whole file is shown.
     const firstChange = rendered.element.querySelector('.diff-added, .diff-deleted');
@@ -720,14 +760,28 @@ function renderDiff() {
     updateRuler();
 }
 
-function setDiffLayout(sideBySide, save) {
-    diffElements.unified.setAttribute('aria-pressed', String(!sideBySide));
-    diffElements.sideBySide.setAttribute('aria-pressed', String(sideBySide));
+const diffLayoutSettingKey = 'git-watcher.diff-layout';
+
+// The layout is unified, side-by-side, old (only the old file), or new (only the new file).
+function setDiffLayout(layout, save) {
+    diffElements.layout.value = layout;
+    // A select ends up with no value when the saved one is no longer an option.
+    if (!diffElements.layout.value) {
+        diffElements.layout.value = 'unified';
+    }
     if (save) {
-        writeSetting('git-watcher.diff-side-by-side', sideBySide ? 'true' : null);
+        writeSetting(diffLayoutSettingKey, diffElements.layout.value === 'unified' ? null : diffElements.layout.value);
     }
     if (isDiffOpen() && diffState.result) {
         renderDiff();
+    }
+}
+
+function setDiffOptionsOpen(open) {
+    diffElements.options.hidden = !open;
+    diffElements.optionsToggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+        diffElements.layout.focus();
     }
 }
 
@@ -740,7 +794,12 @@ function stepDiff(step) {
 }
 
 function loadDiffSettings() {
-    setDiffLayout(readSetting('git-watcher.diff-side-by-side') === 'true', false);
+    // Earlier versions saved only whether the layout was side by side.
+    if (readSetting('git-watcher.diff-side-by-side') === 'true') {
+        writeSetting('git-watcher.diff-side-by-side', null);
+        writeSetting(diffLayoutSettingKey, 'side-by-side');
+    }
+    setDiffLayout(readSetting(diffLayoutSettingKey) || 'unified', false);
     diffElements.ignoreWhitespace.checked = readSetting('git-watcher.diff-ignore-whitespace') === 'true';
     diffElements.syntax.checked = readSetting('git-watcher.diff-syntax') !== 'false';
 }
@@ -748,8 +807,17 @@ function loadDiffSettings() {
 diffElements.previous.addEventListener('click', () => stepDiff(-1));
 diffElements.next.addEventListener('click', () => stepDiff(1));
 diffElements.close.addEventListener('click', closeDiff);
-diffElements.unified.addEventListener('click', () => setDiffLayout(false, true));
-diffElements.sideBySide.addEventListener('click', () => setDiffLayout(true, true));
+diffElements.layout.addEventListener('change', () => setDiffLayout(diffElements.layout.value, true));
+diffElements.optionsToggle.addEventListener('click', () => setDiffOptionsOpen(diffElements.options.hidden));
+
+// Clicking anywhere else, or pressing Escape, closes the diff's options.
+document.addEventListener('pointerdown', (event) => {
+    if (!diffElements.options.hidden
+        && !diffElements.options.contains(event.target)
+        && !diffElements.optionsToggle.contains(event.target)) {
+        setDiffOptionsOpen(false);
+    }
+});
 diffElements.ignoreWhitespace.addEventListener('change', () => {
     writeSetting('git-watcher.diff-ignore-whitespace', diffElements.ignoreWhitespace.checked ? 'true' : null);
     loadDiff();
@@ -811,6 +879,13 @@ diffElements.syntax.addEventListener('change', () => {
 // Escape closes an open menu first, not the view behind it.
 window.addEventListener('keydown', (event) => {
     if (!isDiffOpen() || !elements.options.hidden || !contextMenu.element.hidden) {
+        return;
+    }
+    if (!diffElements.options.hidden) {
+        if (event.key === 'Escape') {
+            setDiffOptionsOpen(false);
+            diffElements.optionsToggle.focus();
+        }
         return;
     }
     if (event.key === 'Escape') {

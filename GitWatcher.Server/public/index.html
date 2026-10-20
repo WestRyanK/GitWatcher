@@ -175,15 +175,32 @@
                             <strong id="diff-title" class="diff-title mono"></strong>
                             <span id="diff-source" class="diff-source muted"></span>
                         </span>
-                        <span class="diff-layout" role="group" aria-label="Layout">
-                            <button id="diff-unified" class="diff-button" type="button" aria-pressed="true">Unified</button>
-                            <button id="diff-side-by-side" class="diff-button" type="button" aria-pressed="false">Side by
-                                side</button>
-                        </span>
-                        <label class="diff-option"><input id="diff-ignore-whitespace" type="checkbox"> Ignore
-                            whitespace</label>
-                        <label class="diff-option"><input id="diff-syntax" type="checkbox" checked> Syntax
-                            colors</label>
+                        <button id="diff-options-toggle" class="options-toggle" type="button" aria-expanded="false"
+                            aria-controls="diff-options" aria-haspopup="true" aria-label="Diff options"
+                            title="Diff options: layout and display">
+                            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                                <path d="M2 4h7M13 4h1M2 12h1M7 12h7M2 8h3M9 8h5" />
+                                <circle cx="11" cy="4" r="1.75" />
+                                <circle cx="5" cy="12" r="1.75" />
+                                <circle cx="7" cy="8" r="1.75" />
+                            </svg>
+                        </button>
+                        <div id="diff-options" class="options controls diff-options" role="group"
+                            aria-label="Diff options" hidden>
+                            <label>
+                                Layout
+                                <select id="diff-layout">
+                                    <option value="unified" selected>Unified</option>
+                                    <option value="side-by-side">Side by side</option>
+                                    <option value="old">Old file only</option>
+                                    <option value="new">New file only</option>
+                                </select>
+                            </label>
+                            <label class="option-check"><input id="diff-ignore-whitespace" type="checkbox"> Ignore
+                                whitespace</label>
+                            <label class="option-check"><input id="diff-syntax" type="checkbox" checked> Syntax
+                                colors</label>
+                        </div>
                         <button id="diff-close" class="diff-button" type="button" title="Close (Esc)"
                             aria-label="Close the diff">✕</button>
                     </div>

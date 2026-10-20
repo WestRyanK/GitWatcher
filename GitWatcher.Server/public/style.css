@@ -1126,6 +1126,7 @@ body.resizing.resizing-rows {
 }
 
 .diff-toolbar {
+    position: relative;
     display: flex;
     flex: none;
     gap: 8px;
@@ -1178,28 +1179,11 @@ body.resizing.resizing-rows {
     cursor: default;
 }
 
-.diff-layout {
-    display: flex;
-}
-
-.diff-layout .diff-button:first-child {
-    border-radius: 6px 0 0 6px;
-}
-
-.diff-layout .diff-button:last-child {
-    margin-left: -1px;
-    border-radius: 0 6px 6px 0;
-}
-
-.diff-layout .diff-button[aria-pressed="true"] {
-    background: var(--bg-selected);
-}
-
-.diff-option {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    font-size: 12px;
+/* The diff's options drop down from its toolbar, like the page's Options menu. */
+.diff-options {
+    right: 8px;
+    width: min(240px, calc(100vw - 24px));
+    white-space: normal;
 }
 
 .diff-main {
