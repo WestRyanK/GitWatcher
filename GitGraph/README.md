@@ -77,7 +77,7 @@ runtime, which comes with Windows 11. How it works:
 
 * `server.js` uses only Node's built-in modules (no `npm install`). It listens on `127.0.0.1` and runs only
   read-only git commands (`log`, `rev-list`, `for-each-ref`, `rev-parse`, `symbolic-ref`, `show`, `diff-tree`,
-  `status`, and `ls-remote --get-url`, which only reads the configured URL) with `GIT_OPTIONAL_LOCKS=0`. It never writes to the repository. The only request that writes anything
+  `status`, `diff`, and `ls-remote --get-url`, which only reads the configured URL) with `GIT_OPTIONAL_LOCKS=0`. It never writes to the repository. The only request that writes anything
   is `PUT /api/settings` (see below); it rejects every other request that isn't `GET`.
 * `GET /api/graph?scope=S&limit=N` returns commits from `git log --topo-order`, plus refs and HEAD. The page's
   **Commits from** selector sets the scope: `current` (`HEAD` only), `local` (`--branches` and `HEAD`), or `all`
@@ -121,6 +121,19 @@ runtime, which comes with Windows 11. How it works:
   they survive restarts, port changes, and cleared browser data, and every worktree shares them. The server only accepts
   a save that comes from the viewer page itself: it must be JSON from the same origin, holding `git-graph.*` string
   values.
+* Click a file in **Commit details** or in the **Status** pane to see its diff, in a view over the Commits pane:
+  - A commit's file is compared with the commit's first parent. A Status file is compared by its group: staged
+    changes with HEAD, unstaged changes with the index, a conflicted file with HEAD, and an untracked file is shown
+    as entirely added.
+  - The whole file is shown, scrolled to the first change, with the changed words highlighted within changed lines.
+    Choose **Unified** or **Side by side**, and **Ignore whitespace** to hide whitespace-only changes; both choices
+    are remembered.
+  - The arrows (or Alt+Up and Alt+Down) step through the other files in the same list, and Escape or ✕ closes the
+    view. A binary file just says that it changed, and a diff over 20,000 lines asks before showing.
+  - `GET /api/diff?commit=<hash>&path=<path>` or `GET /api/diff?worktree=<group>&path=<path>` (add `oldPath` for a
+    rename and `ignoreWhitespace=1`) returns the patch from `git diff` or `git show` with full context. git is told
+    not to run external diff or text conversion programs. Untracked files are read directly and must be inside the
+    repository. The Status pane now lists untracked files one by one, so each can be opened.
 * `GET /api/commit/<hash>` returns the commit's message and its changed files. A merge's files are compared with
   its first parent.
 * `public/app.js` lays the commits out in lanes and draws the graph as plain SVG.

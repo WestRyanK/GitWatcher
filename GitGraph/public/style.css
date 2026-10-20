@@ -20,6 +20,10 @@
     --renamed: #8250df;
     --node-stroke: #ffffff;
     --row-height: 26px;
+    --diff-added-bg: rgb(46 160 67 / 0.14);
+    --diff-added-word: rgb(46 160 67 / 0.38);
+    --diff-deleted-bg: rgb(248 81 73 / 0.14);
+    --diff-deleted-word: rgb(248 81 73 / 0.38);
     color-scheme: light;
 }
 
@@ -1011,4 +1015,225 @@ body.resizing.resizing-rows {
 .branch-item.context-target {
     outline: 1px solid var(--remote-fg);
     outline-offset: -1px;
+}
+
+/* Clickable file lists: a commit's changed files and the Status pane's files open their diff. */
+.files .file-item,
+.status-item {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.files .file-item {
+    padding: 2px 4px;
+}
+
+/* The button resets the font, so keep the Status list's smaller text. */
+.status-item {
+    font-size: 12px;
+}
+
+.files .file-item:hover,
+.files .file-item:focus-visible,
+.status-item:hover,
+.status-item:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+}
+
+/* The diff view covers the Commits pane. */
+#graph-pane {
+    position: relative;
+}
+
+.diff-view {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+}
+
+.diff-view[hidden] {
+    display: none;
+}
+
+.diff-toolbar {
+    display: flex;
+    flex: none;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-alt);
+    white-space: nowrap;
+}
+
+.diff-heading {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: baseline;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.diff-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.diff-source,
+.diff-position {
+    flex: none;
+    font-size: 12px;
+}
+
+.diff-button {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.diff-button:hover:not(:disabled) {
+    background: var(--bg-hover);
+}
+
+.diff-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.diff-layout {
+    display: flex;
+}
+
+.diff-layout .diff-button:first-child {
+    border-radius: 6px 0 0 6px;
+}
+
+.diff-layout .diff-button:last-child {
+    margin-left: -1px;
+    border-radius: 0 6px 6px 0;
+}
+
+.diff-layout .diff-button[aria-pressed="true"] {
+    background: var(--bg-selected);
+}
+
+.diff-whitespace {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.diff-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.diff-message {
+    padding: 16px;
+    color: var(--muted);
+}
+
+.diff-show-anyway {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+/* The lines are a grid, so the line numbers and code line up and long lines scroll sideways together. */
+.diff-grid {
+    display: grid;
+    min-width: 100%;
+    width: max-content;
+    font: 12px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+.diff-unified {
+    grid-template-columns: auto auto auto minmax(max-content, 1fr);
+}
+
+.diff-split {
+    grid-template-columns: auto minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+}
+
+.diff-grid > span {
+    white-space: pre;
+}
+
+.diff-number {
+    padding: 0 8px;
+    min-width: 4ch;
+    text-align: right;
+    color: var(--muted);
+    user-select: none;
+}
+
+.diff-split-right {
+    border-left: 1px solid var(--border);
+}
+
+.diff-marker {
+    padding-right: 6px;
+    color: var(--muted);
+    user-select: none;
+}
+
+.diff-code {
+    padding-right: 16px;
+}
+
+.diff-added {
+    background: var(--diff-added-bg);
+}
+
+.diff-deleted {
+    background: var(--diff-deleted-bg);
+}
+
+.diff-added .diff-word {
+    border-radius: 2px;
+    background: var(--diff-added-word);
+}
+
+.diff-deleted .diff-word {
+    border-radius: 2px;
+    background: var(--diff-deleted-word);
+}
+
+.diff-empty {
+    background: var(--bg-alt);
+}
+
+.diff-gap {
+    grid-column: 1 / -1;
+    padding-left: 12px;
+    color: var(--muted);
+    background: var(--bg-alt);
 }

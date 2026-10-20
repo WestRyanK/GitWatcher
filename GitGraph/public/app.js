@@ -467,14 +467,20 @@ function renderDetails(details) {
         ? `Changed files (${details.files.length}, vs. first parent)`
         : `Changed files (${details.files.length})`;
     container.appendChild(createElement('h2', null, filesHeading));
+    // Click a file to see its diff.
     const files = createElement('ul', 'files');
-    for (const file of details.files) {
+    details.files.forEach((file, index) => {
         const item = createElement('li');
-        item.appendChild(createElement('span', `status status-${file.status}`, file.status));
+        const button = createElement('button', 'file-item');
+        button.type = 'button';
+        button.title = 'Show the diff';
+        button.appendChild(createElement('span', `status status-${file.status}`, file.status));
         const pathText = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
-        item.appendChild(createElement('span', 'mono', pathText));
+        button.appendChild(createElement('span', 'mono', pathText));
+        button.addEventListener('click', () => openDiff({ kind: 'commit', hash: details.hash }, details.files, index));
+        item.appendChild(button);
         files.appendChild(item);
-    }
+    });
     container.appendChild(files);
 
     elements.details.replaceChildren(container);
@@ -1076,11 +1082,13 @@ function renderWorkingTree() {
     fragment.appendChild(createElement('p', 'status-summary', `${branchLabel} · ${tracking}`));
 
     const groups = [
-        { title: 'Conflicts', files: data.conflicted, className: 'status-conflict' },
-        { title: 'Staged', files: data.staged },
-        { title: 'Changes', files: data.unstaged },
-        { title: 'Untracked', files: data.untracked, className: 'status-untracked' },
+        { key: 'conflicted', title: 'Conflicts', files: data.conflicted, className: 'status-conflict' },
+        { key: 'staged', title: 'Staged', files: data.staged },
+        { key: 'unstaged', title: 'Changes', files: data.unstaged },
+        { key: 'untracked', title: 'Untracked', files: data.untracked, className: 'status-untracked' },
     ];
+    // Every file in the order shown, so the diff view's previous and next step through them.
+    const diffFiles = [];
     let total = 0;
     for (const group of groups) {
         if (group.files.length === 0) {
@@ -1089,10 +1097,15 @@ function renderWorkingTree() {
         total += group.files.length;
         fragment.appendChild(createElement('div', 'pane-group', `${group.title} (${group.files.length})`));
         for (const file of group.files) {
-            const item = createElement('div', 'status-item');
+            const index = diffFiles.length;
+            diffFiles.push({ ...file, group: group.key });
+            const item = createElement('button', 'status-item');
+            item.type = 'button';
+            item.title = 'Show the diff';
             item.appendChild(createElement('span', `status ${group.className || statusClass(file.status)}`, file.status));
             const pathText = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
             item.appendChild(createElement('span', 'mono', pathText));
+            item.addEventListener('click', () => openDiff({ kind: 'worktree' }, diffFiles, index));
             fragment.appendChild(item);
         }
     }
@@ -1552,6 +1565,7 @@ async function initialize() {
     loadLayoutSettings();
     restoreControls();
     loadColumnWidths();
+    loadDiffSettings();
     await loadGraph();
     restoreSelection();
     loadWorkingTree();

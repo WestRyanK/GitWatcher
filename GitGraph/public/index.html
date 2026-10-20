@@ -140,6 +140,30 @@
                 <div id="graph-scroll" class="graph-scroll">
                     <div id="graph" class="graph"></div>
                 </div>
+                <!-- One file's diff, over the Commits pane. diff.js fills it in. -->
+                <section id="diff-view" class="diff-view" aria-label="Diff" hidden>
+                    <div class="diff-toolbar">
+                        <button id="diff-previous" class="diff-button" type="button" title="Previous file (Alt+Up)"
+                            aria-label="Previous file">‹</button>
+                        <span id="diff-position" class="diff-position muted"></span>
+                        <button id="diff-next" class="diff-button" type="button" title="Next file (Alt+Down)"
+                            aria-label="Next file">›</button>
+                        <span class="diff-heading">
+                            <strong id="diff-title" class="diff-title mono"></strong>
+                            <span id="diff-source" class="diff-source muted"></span>
+                        </span>
+                        <span class="diff-layout" role="group" aria-label="Layout">
+                            <button id="diff-unified" class="diff-button" type="button" aria-pressed="true">Unified</button>
+                            <button id="diff-side-by-side" class="diff-button" type="button" aria-pressed="false">Side by
+                                side</button>
+                        </span>
+                        <label class="diff-whitespace"><input id="diff-ignore-whitespace" type="checkbox"> Ignore
+                            whitespace</label>
+                        <button id="diff-close" class="diff-button" type="button" title="Close (Esc)"
+                            aria-label="Close the diff">✕</button>
+                    </div>
+                    <div id="diff-body" class="diff-body"></div>
+                </section>
             </section>
             <div id="splitter" class="splitter" role="separator" tabindex="0" aria-controls="details-pane"
                 aria-label="Resize the commit details panel" title="Drag to resize. Double-click to reset."></div>
@@ -159,5 +183,6 @@
     </main>
     <div id="context-menu" class="context-menu" role="menu" aria-label="Actions" hidden></div>
     <script src="app.js"></script>
+    <script src="diff.js"></script>
 </body>
 </html>

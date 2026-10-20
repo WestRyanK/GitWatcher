@@ -27,6 +27,7 @@ const settingKeyPattern = /^git-graph\.[\w.-]{1,100}$/;
 // prints the configured URL without contacting the remote.
 const allowedGitCommands = new Set([
     'log', 'rev-list', 'for-each-ref', 'rev-parse', 'symbolic-ref', 'show', 'diff-tree', 'status', 'ls-remote',
+    'diff',
 ]);
 
 // Which commits to include, as git revision arguments.
@@ -343,7 +344,7 @@ async function getTags() {
 
 // Parses `git status --porcelain=v2 --branch -z`. See git-status(1), "Porcelain Format Version 2".
 async function getStatus() {
-    const output = await runGit(['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=normal']);
+    const output = await runGit(['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all']);
     const tokens = output.split('\0');
     const status = {
         branch: { head: null, oid: null, upstream: null, ahead: 0, behind: 0 },
@@ -458,10 +459,81 @@ function isSameOriginJsonRequest(request) {
         && (origin === `http://${hostHeader}`);
 }
 
+// Options for every diff. The whole file is shown, not just the changed parts, renames are detected, and git is told
+// not to run any external diff or text conversion program a repository might configure.
+const fullFileDiffOptions = ['--no-color', '--no-ext-diff', '--no-textconv', '-M', '--unified=1000000'];
+const maxUntrackedFileBytes = 20 * 1024 * 1024;
+
+function getDiffPaths(filePath, oldPath) {
+    return oldPath && oldPath !== filePath ? [oldPath, filePath] : [filePath];
+}
+
+// A commit's changes to one file, compared with its first parent. The root commit has no parent, so it's shown with
+// `git show`, which lists every file as added.
+async function getCommitDiff(hash, filePath, oldPath, ignoreWhitespace) {
+    const whitespace = ignoreWhitespace ? ['--ignore-all-space'] : [];
+    const paths = getDiffPaths(filePath, oldPath);
+    const parent = await runGitOrNull(['rev-parse', '--verify', '-q', `${hash}^`]);
+    const patch = parent
+        ? await runGit(['diff', ...fullFileDiffOptions, ...whitespace, parent, hash, '--', ...paths])
+        : await runGit(['show', '--format=', ...fullFileDiffOptions, ...whitespace, hash, '--', ...paths]);
+    return { patch };
+}
+
+// A working tree change to one file, as the Status pane groups it: staged (the index against HEAD), unstaged (the
+// working tree against the index), untracked (the whole file, as added), or conflicted (the working tree, conflict
+// markers and all, against HEAD).
+async function getWorkingTreeDiff(group, filePath, oldPath, ignoreWhitespace) {
+    if (group === 'untracked') {
+        return readUntrackedFile(filePath);
+    }
+
+    const args = ['diff', ...fullFileDiffOptions];
+    if (ignoreWhitespace) {
+        args.push('--ignore-all-space');
+    }
+    if (group === 'staged') {
+        args.push('--cached');
+    } else if (group === 'conflicted') {
+        args.push('HEAD');
+    }
+    args.push('--', ...getDiffPaths(filePath, oldPath));
+    return { patch: await runGit(args) };
+}
+
+// git has no diff for a file it doesn't track, so read the file and present it as entirely added. The path must be
+// inside the repository.
+async function readUntrackedFile(filePath) {
+    const toplevel = await runGitOrNull(['rev-parse', '--show-toplevel']);
+    const root = path.resolve(toplevel || repoRoot);
+    const fullPath = path.resolve(root, filePath);
+    if (!fullPath.toLowerCase().startsWith(`${root.toLowerCase()}${path.sep}`)) {
+        throw new Error('The file is outside the repository.');
+    }
+
+    const stats = await fs.promises.stat(fullPath);
+    if (stats.size > maxUntrackedFileBytes) {
+        return { tooLarge: true, size: stats.size };
+    }
+    const content = await fs.promises.readFile(fullPath);
+    // Like git, treat a file with a NUL byte near the start as binary.
+    if (content.subarray(0, 8000).includes(0)) {
+        return { binary: true };
+    }
+
+    const lines = content.toString('utf8').split('\n');
+    if (lines[lines.length - 1] === '') {
+        lines.pop();
+    }
+    const header = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
+    return { patch: header + lines.map((line) => `+${line}\n`).join('') };
+}
+
 const staticFiles = {
     '/': { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/index.html': { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
+    '/diff.js': { file: 'diff.js', type: 'text/javascript; charset=utf-8' },
     '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
 };
 
@@ -526,6 +598,27 @@ const server = http.createServer(async (request, response) => {
 
         if (url.pathname === '/api/status') {
             sendJson(response, 200, await getStatus());
+            return;
+        }
+
+        if (url.pathname === '/api/diff') {
+            const filePath = url.searchParams.get('path') || '';
+            const oldPath = url.searchParams.get('oldPath') || null;
+            const ignoreWhitespace = url.searchParams.get('ignoreWhitespace') === '1';
+            const commit = url.searchParams.get('commit');
+            const worktree = url.searchParams.get('worktree');
+            const validPath = (value) => value.length > 0 && value.length <= 4096 && !value.includes('\0');
+            if (!validPath(filePath) || (oldPath !== null && !validPath(oldPath))) {
+                sendJson(response, 400, { error: 'A file path is required.' });
+                return;
+            }
+            if (commit !== null && /^[0-9a-f]{4,40}$/i.test(commit)) {
+                sendJson(response, 200, await getCommitDiff(commit, filePath, oldPath, ignoreWhitespace));
+            } else if (['staged', 'unstaged', 'untracked', 'conflicted'].includes(worktree)) {
+                sendJson(response, 200, await getWorkingTreeDiff(worktree, filePath, oldPath, ignoreWhitespace));
+            } else {
+                sendJson(response, 400, { error: 'Give a commit hash or a working tree group.' });
+            }
             return;
         }
 
