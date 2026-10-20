@@ -682,10 +682,10 @@ body.resizing.resizing-rows {
     font-size: 12px;
 }
 
-/* The columns after the graph: the description (branch labels and subject), author, date, and commit. Until the
-   description is resized, it fills the space and the commit column is narrow. Once it has a width, the columns after
-   it keep their widths and move along, and the commit column takes what's left. app.js sets the widths on the graph
-   pane, and an author or date column dragged to nothing is hidden. */
+/* The columns after the graph: the description (branch labels and subject), author, date, and commit. The author,
+   date, and commit columns have set widths and stay against the right edge; the description takes the rest, so it's
+   the only column that changes when the pane is resized. app.js sets the widths on the graph pane, and a column
+   dragged to nothing is hidden. */
 .row .column {
     flex: none;
     overflow: hidden;
@@ -700,10 +700,6 @@ body.resizing.resizing-rows {
     min-width: 0;
 }
 
-.fixed-description .row .col-description {
-    flex: none;
-    width: var(--col-description);
-}
 
 .row .col-author {
     width: var(--col-author, 110px);
@@ -714,17 +710,12 @@ body.resizing.resizing-rows {
 }
 
 .row .col-hash {
-    width: 64px;
-}
-
-.fixed-description .row .col-hash {
-    flex: 1 1 0;
-    width: auto;
-    min-width: 0;
+    width: var(--col-hash, 64px);
 }
 
 .hide-author .row .col-author,
-.hide-date .row .col-date {
+.hide-date .row .col-date,
+.hide-hash .row .col-hash {
     display: none;
 }
 

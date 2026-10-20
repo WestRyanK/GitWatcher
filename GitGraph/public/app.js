@@ -1347,12 +1347,13 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-// The columns after the graph: the description (branch labels and subject), author, date, and commit. Each edge in
-// the Commits title row resizes the column to its left, and the columns after it move along, like a table. Until it's
-// resized, the description fills the space; once it has a width, the commit column takes what's left. Widths are CSS
-// variables on the graph pane, and an author or date column dragged narrower than the minimum is hidden.
-const columnDefaults = { description: null, author: 110, date: 112 };
-const columnMinimumWidth = { description: 60, author: 24, date: 24 };
+// The columns after the graph: the description (branch labels and subject), author, date, and commit. The author,
+// date, and commit columns have widths and stay against the right edge, and the description takes the rest, so
+// resizing the pane (for example, opening the sidebar) only changes the description. Widths are CSS variables on the
+// graph pane. A column dragged narrower than the minimum is hidden.
+const columnDefaults = { author: 110, date: 112, hash: 64 };
+const columnMinimumWidth = 24;
+const descriptionMinimumWidth = 60;
 const columnMaximumWidth = 2000;
 const columnWidths = {};
 
@@ -1360,37 +1361,31 @@ const columnWidths = {};
 const resizedByEdgeOf = { author: 'description', date: 'author', hash: 'date' };
 
 function setColumnWidth(column, width) {
-    if (width === null) {
-        columnWidths[column] = null;
-        elements.graphPane.style.removeProperty(`--col-${column}`);
-        elements.graphPane.classList.remove('fixed-description');
-    } else {
-        const clamped = Math.min(Math.round(width), columnMaximumWidth);
-        const minimum = columnMinimumWidth[column];
-        const visibleWidth = clamped >= minimum ? clamped : (column === 'description' ? minimum : 0);
-        columnWidths[column] = visibleWidth;
-        elements.graphPane.style.setProperty(`--col-${column}`, `${visibleWidth}px`);
-        if (column === 'description') {
-            elements.graphPane.classList.add('fixed-description');
-        } else {
-            elements.graphPane.classList.toggle(`hide-${column}`, visibleWidth === 0);
-        }
-    }
+    const clamped = Math.min(Math.max(Math.round(width), 0), columnMaximumWidth);
+    const visibleWidth = clamped < columnMinimumWidth ? 0 : clamped;
+    columnWidths[column] = visibleWidth;
+    elements.graphPane.style.setProperty(`--col-${column}`, `${visibleWidth}px`);
+    elements.graphPane.classList.toggle(`hide-${column}`, visibleWidth === 0);
     alignColumnHeaders();
 }
 
 // Without saved widths, a narrow window (such as the Windows Terminal overlay) starts without the author and date.
 function loadColumnWidths() {
+    // Earlier versions saved a width for the description; it now always takes the space that's left.
+    if (readSetting('git-graph.column-description') !== null) {
+        writeSetting('git-graph.column-description', null);
+    }
+
     const narrow = window.innerWidth < 760;
     for (const column of Object.keys(columnDefaults)) {
         const saved = Number.parseInt(readSetting(`git-graph.column-${column}`) || '', 10);
-        const fallback = narrow && column !== 'description' ? 0 : columnDefaults[column];
+        const fallback = narrow && column !== 'hash' ? 0 : columnDefaults[column];
         setColumnWidth(column, Number.isFinite(saved) ? saved : fallback);
     }
 }
 
 // Places each label over its column, measured from the first row, so it follows the column widths, the graph's
-// width, and the list's scroll bar. A hidden column's label shrinks to just its edge, at the next column.
+// width, and the list's scroll bar. A hidden column's label shrinks to just its edge, where the column would be.
 function alignColumnHeaders() {
     const row = elements.graph.querySelector('.row');
     elements.columnHeaders.hidden = !row;
@@ -1399,11 +1394,13 @@ function alignColumnHeaders() {
     }
 
     const origin = elements.columnHeaders.getBoundingClientRect().left;
-    let nextLeft = null;
+    const rowRect = row.getBoundingClientRect();
+    const contentRight = rowRect.right - Number.parseFloat(getComputedStyle(row).paddingRight);
+    let nextLeft = contentRight + 8;
     for (const header of [...elements.columnHeaders.querySelectorAll('.column-header')].reverse()) {
         const cell = row.querySelector(`.col-${header.dataset.column}`);
-        const rect = cell.getBoundingClientRect();
         const hidden = getComputedStyle(cell).display === 'none';
+        const rect = cell.getBoundingClientRect();
         const left = hidden ? nextLeft : rect.left;
         header.style.left = `${left - origin}px`;
         header.style.width = `${hidden ? 0 : rect.width}px`;
@@ -1417,36 +1414,52 @@ for (const header of elements.columnHeaders.querySelectorAll('.column-header')) 
     const column = resizedByEdgeOf[header.dataset.column];
     const resizer = header.querySelector('.column-resizer');
 
-    // The edge is on the right of the resized column, so dragging right widens it and moves the columns after it.
+    // Dragging an edge resizes the column to its left, and the columns after it move along, like a table. The right
+    // edge stays put, so the commit column, the last one, gives or takes the difference. The description has no
+    // width of its own: its edge only moves the columns after it, which changes how much space it gets.
     resizer.addEventListener('pointerdown', (event) => {
         if (event.button !== 0) {
             return;
         }
         event.preventDefault();
         const startX = event.clientX;
-        const row = elements.graph.querySelector('.row');
-        const startWidth = columnWidths[column] ?? Math.round(row.querySelector(`.col-${column}`).getBoundingClientRect().width);
+        const startHash = columnWidths.hash;
+        const startWidth = column === 'description'
+            ? elements.graph.querySelector('.row .col-description').getBoundingClientRect().width
+            : columnWidths[column];
+        const minimumMove = column === 'description' ? descriptionMinimumWidth - startWidth : -startWidth;
         resizer.setPointerCapture(event.pointerId);
         resizer.classList.add('dragging');
         document.body.classList.add('resizing');
 
-        const onMove = (moveEvent) => setColumnWidth(column, startWidth + (moveEvent.clientX - startX));
+        const onMove = (moveEvent) => {
+            const move = Math.min(Math.max(moveEvent.clientX - startX, minimumMove), startHash);
+            if (column !== 'description') {
+                setColumnWidth(column, startWidth + move);
+            }
+            setColumnWidth('hash', startHash - move);
+        };
         const onEnd = () => {
             resizer.removeEventListener('pointermove', onMove);
             resizer.removeEventListener('pointerup', onEnd);
             resizer.removeEventListener('pointercancel', onEnd);
             resizer.classList.remove('dragging');
             document.body.classList.remove('resizing');
-            writeSetting(`git-graph.column-${column}`, String(columnWidths[column]));
+            writeSetting('git-graph.column-hash', String(columnWidths.hash));
+            if (column !== 'description') {
+                writeSetting(`git-graph.column-${column}`, String(columnWidths[column]));
+            }
         };
         resizer.addEventListener('pointermove', onMove);
         resizer.addEventListener('pointerup', onEnd);
         resizer.addEventListener('pointercancel', onEnd);
     });
 
+    // Double-clicking an edge resets the column to its left, or for the description's edge, the commit column.
     resizer.addEventListener('dblclick', () => {
-        setColumnWidth(column, columnDefaults[column]);
-        writeSetting(`git-graph.column-${column}`, null);
+        const reset = column === 'description' ? 'hash' : column;
+        setColumnWidth(reset, columnDefaults[reset]);
+        writeSetting(`git-graph.column-${reset}`, null);
     });
 }
 // Selects the commit selected last time, if it's in the graph.
