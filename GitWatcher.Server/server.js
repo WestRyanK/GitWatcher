@@ -187,7 +187,7 @@ function getCommitWebLink(remoteUrl) {
 
 async function getGraph(limit, scope) {
     const revisions = scopeRevisions[scope];
-    const [{ refs, raw }, head, logOutput, totalOutput, toplevel, remoteUrl] = await Promise.all([
+    const [{ refs, raw }, head, logOutput, totalOutput, toplevel, remoteUrl, originHead] = await Promise.all([
         getRefs(),
         getHead(),
         runGit([
@@ -197,6 +197,7 @@ async function getGraph(limit, scope) {
         runGitOrNull(['rev-list', ...revisions, '--count']).catch(() => null),
         runGitOrNull(['rev-parse', '--show-toplevel']),
         runGitOrNull(['ls-remote', '--get-url', 'origin']),
+        runGitOrNull(['symbolic-ref', '-q', '--short', 'refs/remotes/origin/HEAD']),
     ]);
 
     const commits = [];
@@ -225,6 +226,8 @@ async function getGraph(limit, scope) {
         repoPath: toplevel || repoRoot,
         head,
         refs,
+        // The branch origin/HEAD points at ("main"), or null when the remote doesn't say.
+        defaultBranch: originHead ? originHead.replace(/^origin\//, '') : null,
         commits,
         limit,
         scope,
