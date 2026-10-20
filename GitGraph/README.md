@@ -127,7 +127,9 @@ runtime, which comes with Windows 11. How it works:
     as entirely added.
   - The whole file is shown, scrolled to the first change, with the changed words highlighted within changed lines.
     Choose **Unified** or **Side by side**, and **Ignore whitespace** to hide whitespace-only changes; both choices
-    are remembered.
+    are remembered. Side by side shows the old and new file in two panes that scroll sideways on their own and
+    vertically together. Drag the divider between them to resize them (double-click it to reset); the split is
+    remembered too.
   - The arrows (or Alt+Up and Alt+Down) step through the other files in the same list, and Escape or ✕ closes the
     view. A binary file just says that it changed, and a diff over 20,000 lines asks before showing.
   - `GET /api/diff?commit=<hash>&path=<path>` or `GET /api/diff?worktree=<group>&path=<path>` (add `oldPath` for a

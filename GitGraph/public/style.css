@@ -1170,37 +1170,110 @@ body.resizing.resizing-rows {
 /* The lines are a grid, so the line numbers and code line up and long lines scroll sideways together. */
 .diff-grid {
     display: grid;
+    /* Every row is one line high, including a side-by-side row that's blank on one side, so the panes line up. */
+    grid-auto-rows: 18px;
     min-width: 100%;
     width: max-content;
-    font: 12px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+    font: 12px/18px ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
 .diff-unified {
-    grid-template-columns: auto auto auto minmax(max-content, 1fr);
+    grid-template-columns: auto auto minmax(max-content, 1fr);
 }
 
-.diff-split {
-    grid-template-columns: auto minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+/* Side by side: two panes, each scrolling sideways on its own, with a divider that sets the left pane's share. Both
+   always show a horizontal scroll bar, so their rows stay level; only the right pane shows the vertical one. */
+.diff-body.diff-body-split {
+    overflow: hidden;
+}
+
+.diff-split-view {
+    display: flex;
+    height: 100%;
+}
+
+.diff-split-pane {
+    position: relative;
+    min-width: 0;
+    overflow-x: scroll;
+}
+
+.diff-split-left {
+    flex: 0 0 var(--diff-split-left, 50%);
+    overflow-y: hidden;
+}
+
+.diff-split-right {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.diff-split-side {
+    grid-template-columns: auto minmax(max-content, 1fr);
+}
+
+.diff-split-divider {
+    flex: none;
+    width: 1px;
+    margin: 0 -3px;
+    padding: 0 3px;
+    z-index: 1;
+    background: var(--border);
+    background-clip: content-box;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.diff-split-divider:hover,
+.diff-split-divider.dragging {
+    background-color: var(--remote-fg);
 }
 
 .diff-grid > span {
     white-space: pre;
 }
 
+/* Line numbers stay at the left edge while the code scrolls sideways under them, so they need a solid background:
+   the line's color laid over the page's. */
 .diff-number {
+    position: sticky;
+    left: 0;
+    z-index: 1;
     padding: 0 8px;
     min-width: 4ch;
     text-align: right;
     color: var(--muted);
+    background: var(--bg);
+    box-shadow: inset -1px 0 var(--border);
     user-select: none;
 }
 
-.diff-split-right {
-    border-left: 1px solid var(--border);
+.diff-number.diff-added {
+    background: linear-gradient(var(--diff-added-bg), var(--diff-added-bg)), var(--bg);
 }
 
+.diff-number.diff-deleted {
+    background: linear-gradient(var(--diff-deleted-bg), var(--diff-deleted-bg)), var(--bg);
+}
+
+.diff-number.diff-empty {
+    background: var(--bg-alt);
+}
+
+/* The unified view's old and new line numbers share one gutter. */
+.diff-gutter {
+    display: flex;
+    gap: 8px;
+}
+
+.diff-gutter-number {
+    min-width: 4ch;
+    text-align: right;
+}
+
+
 .diff-marker {
-    padding-right: 6px;
+    padding: 0 6px;
     color: var(--muted);
     user-select: none;
 }

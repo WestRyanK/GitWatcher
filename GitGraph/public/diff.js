@@ -200,7 +200,8 @@ function createCodeCell(line, sideClass) {
 
 const lineClasses = { context: 'diff-context', deleted: 'diff-deleted', added: 'diff-added' };
 
-// Unified: one column of lines, each with its old and new line numbers.
+// Unified: one column of lines, each with its old and new line numbers in one gutter that stays put while the code
+// scrolls sideways.
 function renderUnified(lines) {
     const grid = createDiffCell('diff-grid diff-unified');
     for (const line of lines) {
@@ -209,32 +210,38 @@ function renderUnified(lines) {
             continue;
         }
         const lineClass = lineClasses[line.type];
-        grid.appendChild(createDiffCell(`diff-number ${lineClass}`, line.oldNumber ?? ''));
-        grid.appendChild(createDiffCell(`diff-number ${lineClass}`, line.newNumber ?? ''));
+        const gutter = createDiffCell(`diff-number diff-gutter ${lineClass}`);
+        gutter.appendChild(createDiffCell('diff-gutter-number', line.oldNumber ?? ''));
+        gutter.appendChild(createDiffCell('diff-gutter-number', line.newNumber ?? ''));
+        grid.appendChild(gutter);
         grid.appendChild(createDiffCell(`diff-marker ${lineClass}`, line.type === 'added' ? '+' : line.type === 'deleted' ? '-' : ''));
         grid.appendChild(createCodeCell(line, lineClass));
     }
     return grid;
 }
 
-// Side by side: the old file on the left and the new file on the right. A run of changes lines up its deleted and
-// added lines, leaving blanks where one side has more.
+// Side by side: the old file on the left and the new file on the right, each in its own pane that scrolls sideways
+// on its own, with a divider between them that can be dragged. A run of changes lines up its deleted and added
+// lines, leaving blanks where one side has more. Lines don't wrap, so the rows of the two panes always line up, and
+// their vertical scrolling is kept in step. Returns the view and the pane that scrolls vertically.
 function renderSideBySide(lines) {
-    const grid = createDiffCell('diff-grid diff-split');
+    const leftGrid = createDiffCell('diff-grid diff-split-side');
+    const rightGrid = createDiffCell('diff-grid diff-split-side');
     const appendRow = (left, right) => {
         const leftClass = left ? lineClasses[left.type] : 'diff-empty';
         const rightClass = right ? lineClasses[right.type] : 'diff-empty';
-        grid.appendChild(createDiffCell(`diff-number ${leftClass}`, left?.oldNumber ?? ''));
-        grid.appendChild(createCodeCell(left, leftClass));
-        grid.appendChild(createDiffCell(`diff-number diff-split-right ${rightClass}`, right?.newNumber ?? ''));
-        grid.appendChild(createCodeCell(right, rightClass));
+        leftGrid.appendChild(createDiffCell(`diff-number ${leftClass}`, left?.oldNumber ?? ''));
+        leftGrid.appendChild(createCodeCell(left, leftClass));
+        rightGrid.appendChild(createDiffCell(`diff-number ${rightClass}`, right?.newNumber ?? ''));
+        rightGrid.appendChild(createCodeCell(right, rightClass));
     };
 
     let index = 0;
     while (index < lines.length) {
         const line = lines[index];
         if (line.type === 'gap') {
-            grid.appendChild(createDiffCell('diff-gap', '⋯'));
+            leftGrid.appendChild(createDiffCell('diff-gap', '⋯'));
+            rightGrid.appendChild(createDiffCell('diff-gap', '⋯'));
             index++;
         } else if (line.type === 'context') {
             appendRow(line, line);
@@ -253,9 +260,79 @@ function renderSideBySide(lines) {
             }
         }
     }
-    return grid;
+
+    const view = createDiffCell('diff-split-view');
+    const leftPane = createDiffCell('diff-split-pane diff-split-left');
+    const rightPane = createDiffCell('diff-split-pane diff-split-right');
+    const divider = createDiffCell('diff-split-divider');
+    divider.setAttribute('role', 'separator');
+    divider.setAttribute('aria-orientation', 'vertical');
+    divider.title = 'Drag to resize. Double-click to reset.';
+    leftPane.appendChild(leftGrid);
+    rightPane.appendChild(rightGrid);
+    view.append(leftPane, divider, rightPane);
+
+    // The right pane has the vertical scroll bar. The left pane follows it, and passes its own wheel scrolling on.
+    rightPane.addEventListener('scroll', () => {
+        leftPane.scrollTop = rightPane.scrollTop;
+    });
+    leftPane.addEventListener('wheel', (event) => {
+        if (event.deltaY !== 0 && !event.shiftKey) {
+            rightPane.scrollTop += event.deltaY;
+        }
+    }, { passive: true });
+    attachSplitDivider(view, divider);
+
+    return { element: view, scroller: rightPane };
 }
 
+const diffSplitSettingKey = 'git-graph.diff-split';
+const diffSplitDefault = 50;
+
+function setDiffSplit(view, percent) {
+    const clamped = Math.min(Math.max(percent, 15), 85);
+    view.style.setProperty('--diff-split-left', `${clamped}%`);
+    return clamped;
+}
+
+// Dragging the divider sets the left pane's share of the width, which is remembered. Double-clicking resets it.
+function attachSplitDivider(view, divider) {
+    const saved = Number.parseFloat(readSetting(diffSplitSettingKey) || '');
+    setDiffSplit(view, Number.isFinite(saved) ? saved : diffSplitDefault);
+
+    divider.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        divider.setPointerCapture(event.pointerId);
+        divider.classList.add('dragging');
+        document.body.classList.add('resizing');
+        let percent = null;
+        const onMove = (moveEvent) => {
+            const rect = view.getBoundingClientRect();
+            percent = setDiffSplit(view, ((moveEvent.clientX - rect.left) / rect.width) * 100);
+        };
+        const onEnd = () => {
+            divider.removeEventListener('pointermove', onMove);
+            divider.removeEventListener('pointerup', onEnd);
+            divider.removeEventListener('pointercancel', onEnd);
+            divider.classList.remove('dragging');
+            document.body.classList.remove('resizing');
+            if (percent !== null) {
+                writeSetting(diffSplitSettingKey, percent.toFixed(1));
+            }
+        };
+        divider.addEventListener('pointermove', onMove);
+        divider.addEventListener('pointerup', onEnd);
+        divider.addEventListener('pointercancel', onEnd);
+    });
+
+    divider.addEventListener('dblclick', () => {
+        setDiffSplit(view, diffSplitDefault);
+        writeSetting(diffSplitSettingKey, null);
+    });
+}
 const diffState = {
     files: [],
     index: 0,
@@ -391,13 +468,17 @@ function renderDiff() {
     }
 
     const sideBySide = diffElements.sideBySide.getAttribute('aria-pressed') === 'true';
-    diffElements.body.replaceChildren(sideBySide ? renderSideBySide(parsed.lines) : renderUnified(parsed.lines));
+    const rendered = sideBySide
+        ? renderSideBySide(parsed.lines)
+        : { element: renderUnified(parsed.lines), scroller: diffElements.body };
+    diffElements.body.classList.toggle('diff-body-split', sideBySide);
+    diffElements.body.replaceChildren(rendered.element);
     diffElements.body.scrollTop = 0;
 
     // Start at the first change, since the whole file is shown.
-    const firstChange = diffElements.body.querySelector('.diff-added, .diff-deleted');
+    const firstChange = rendered.element.querySelector('.diff-added, .diff-deleted');
     if (firstChange) {
-        diffElements.body.scrollTop = Math.max(0, firstChange.offsetTop - diffElements.body.clientHeight / 3);
+        rendered.scroller.scrollTop = Math.max(0, firstChange.offsetTop - rendered.scroller.clientHeight / 3);
     }
 }
 
