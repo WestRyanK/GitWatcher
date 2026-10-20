@@ -87,8 +87,10 @@ runtime, which comes with Windows 11. How it works:
 * `GET /api/branches` returns local and remote branches from `git for-each-ref`, with each local branch's upstream,
   ahead/behind counts, and the worktree it's checked out in, plus every tag, by name. The **Branches** pane
   shows them as a tree: a **Branches** node for the local branches, and **Remote branches** and **Tags** nodes,
-  which start closed. Inside them, branches are in folders by name (`claude/...` under **claude**). Nodes and
-  folders open and close with a click. Click a branch or tag to jump to its commit.
+  which start closed. Inside them, branches are in folders by name (`claude/...` under **claude**). Tags are grouped
+  the same way, by slashes, or by hyphens (`MyApp-v2026.10.02` under **MyApp**), or not at all: choose with
+  **Group tags by** in the **Options** menu or by right-clicking the **Tags** node. Nodes and folders open and close
+  with a click. Click a branch or tag to jump to its commit.
 * `GET /api/status` returns `git status --porcelain=v2 --branch` for the folder the server runs in: conflicts,
   staged, unstaged, and untracked files. The **Status** pane polls it with the graph. `GIT_OPTIONAL_LOCKS=0` stops
   `git status` from writing its refreshed index.

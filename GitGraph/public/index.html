@@ -55,7 +55,14 @@
                     <option value="20000">All</option>
                 </select>
             </label>
-            <fieldset class="option-columns">
+            <label>
+                Group tags by
+                <select id="tag-grouping">
+                    <option value="slash" selected>Slash (/)</option>
+                    <option value="hyphen">Hyphen (-)</option>
+                    <option value="none">Don't group</option>
+                </select>
+            </label>            <fieldset class="option-columns">
                 <legend>Columns</legend>
                 <label class="option-check"><input class="column-toggle" data-column="author" type="checkbox" checked>
                     Author</label>

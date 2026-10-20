@@ -42,6 +42,7 @@ const elements = {
     graphPane: document.getElementById('graph-pane'),
     columnHeaders: document.getElementById('column-headers'),
     columnToggles: [...document.querySelectorAll('.column-toggle')],
+    tagGrouping: document.getElementById('tag-grouping'),
     graph: document.getElementById('graph'),
     details: document.getElementById('details'),
 };
@@ -487,6 +488,7 @@ const settingKeys = {
     branchFilter: 'git-graph.branch-filter',
     selectedCommit: 'git-graph.selected-commit',
     collapsedPrefix: 'git-graph.collapsed.',
+    tagGrouping: 'git-graph.tag-grouping',
 };
 const keyboardResizeStep = 24;
 const settingsSaveDelayMs = 300;
@@ -759,6 +761,7 @@ for (const toggle of paneToggles) {
 
 
 elements.branchFilter.addEventListener('input', renderBranches);
+elements.tagGrouping.addEventListener('change', renderBranches);
 
 splitters.forEach(attachSplitter);
 
@@ -819,6 +822,17 @@ function createBranchItem(branch, displayName = branch.name, depth = 0) {
     return item;
 }
 
+// How tags are grouped into folders by their names: "MyApp-v2026.10.02" goes in a "MyApp" folder when grouping
+// by hyphens. The choice is in the Options menu and the Tags node's right-click menu.
+const tagSeparators = { slash: '/', hyphen: '-', none: null };
+const tagGroupingLabels = { slash: 'Group by slash (/)', hyphen: 'Group by hyphen (-)', none: "Don't group" };
+
+function setTagGrouping(grouping) {
+    elements.tagGrouping.value = grouping;
+    writeSetting(settingKeys.tagGrouping, grouping);
+    renderBranches();
+}
+
 // The Remote branches and Tags nodes are closed by default, unlike the branch folders, so each has its own setting.
 const closedByDefaultNodes = {
     remote: 'git-graph.remote-branches-open',
@@ -852,11 +866,15 @@ function saveCollapsedBranchFolders() {
     writeSetting(branchFolderSettingKey, paths.length > 0 ? JSON.stringify(paths) : null);
 }
 
-// Groups branches into folders by the parts of their names: "claude/fix-x" goes in a "claude" folder.
-function buildBranchTree(branches) {
+// Groups branches into folders by the parts of their names: "claude/fix-x" goes in a "claude" folder. The separator
+// can be changed (tags can be grouped by hyphens), and with no separator the list is flat.
+function buildBranchTree(branches, separator = '/') {
     const root = { folders: new Map(), branches: [] };
     for (const branch of branches) {
-        const parts = branch.name.split('/');
+        const parts = separator ? branch.name.split(separator).filter((part) => part !== '') : [branch.name];
+        if (parts.length === 0) {
+            parts.push(branch.name);
+        }
         let node = root;
         for (const part of parts.slice(0, -1)) {
             if (!node.folders.has(part)) {
@@ -963,11 +981,11 @@ function renderBranches() {
     // The tree has a top-level node each for the local branches, the remote branches, and the tags. Branches starts
     // open. Remote branches and Tags start closed, because a repository can have many of them. While filtering,
     // every node with a match is open.
-    const appendRootNode = (name, path, items, open, pathPrefix, createItem) => {
+    const appendRootNode = (name, path, items, open, pathPrefix, createItem, separator = '/') => {
         if (items.length === 0) {
             return;
         }
-        const tree = buildBranchTree(items);
+        const tree = buildBranchTree(items, separator);
         const isOpen = filtering || open;
         fragment.appendChild(createFolderRow(name, path, 0, isOpen, items.length, !isOpen && treeHasCurrentBranch(tree)));
         if (isOpen) {
@@ -978,7 +996,7 @@ function renderBranches() {
     const openByDefault = (path) => readSetting(closedByDefaultNodes[path]) === 'true';
     appendRootNode('Branches', 'branches', local, !collapsedFolders.has('branches'), 'local:', createBranchItem);
     appendRootNode('Remote branches', 'remote', remote, openByDefault('remote'), 'remote:', createBranchItem);
-    appendRootNode('Tags', 'tags', tags, openByDefault('tags'), 'tags:', createTagItem);
+    appendRootNode('Tags', 'tags', tags, openByDefault('tags'), 'tags:', createTagItem, tagSeparators[elements.tagGrouping.value]);
     if (local.length === 0 && remote.length === 0 && tags.length === 0) {
         fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches or tags match.' : 'No branches.'));
     }
@@ -1236,6 +1254,16 @@ elements.graph.addEventListener('contextmenu', (event) => {
 });
 
 elements.branches.addEventListener('contextmenu', (event) => {
+    const tagsNode = event.target.closest('.branch-folder[data-path="tags"]');
+    if (tagsNode) {
+        openContextMenu(event, tagsNode, Object.entries(tagGroupingLabels).map(([grouping, label]) => ({
+            label,
+            checked: elements.tagGrouping.value === grouping,
+            action: () => setTagGrouping(grouping),
+        })));
+        return;
+    }
+
     const item = event.target.closest('.branch-item');
     if (!item) {
         return;
@@ -1291,6 +1319,7 @@ const rememberedControls = [
     { element: elements.autoRefresh, key: settingKeys.autoRefresh, event: 'change', checkbox: true },
     { element: elements.filter, key: settingKeys.commitFilter, event: 'input' },
     { element: elements.branchFilter, key: settingKeys.branchFilter, event: 'input' },
+    { element: elements.tagGrouping, key: settingKeys.tagGrouping, event: 'change' },
 ];
 
 function restoreControls() {
