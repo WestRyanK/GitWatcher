@@ -47,7 +47,9 @@ const elements = {
     refresh: document.getElementById('refresh'),
     status: document.getElementById('status'),
     repoBanner: document.getElementById('repo-banner'),
+    repoBannerTitle: document.getElementById('repo-banner-title'),
     repoBannerMessage: document.getElementById('repo-banner-message'),
+    repoBannerHint: document.getElementById('repo-banner-hint'),
     optionsToggle: document.getElementById('options-toggle'),
     options: document.getElementById('options'),
 
@@ -425,10 +427,22 @@ function setStatus(text) {
 }
 
 // Shows the banner for a missing repository with the server's explanation, or hides it when message is null.
-function setRepoProblem(message) {
+// notRepository means the followed shell is in a folder outside any repository, rather than the repository being gone.
+function setRepoProblem(message, notRepository = false) {
     elements.repoBanner.hidden = message === null;
+    elements.repoBannerTitle.textContent = notRepository ? 'Not a git repository' : 'Repository not found';
     elements.repoBannerMessage.textContent = message ?? '';
+    elements.repoBannerHint.textContent = notRepository
+        ? 'Git Watcher shows a repository again once the terminal changes to a folder in one.'
+        : 'Git Watcher keeps checking and picks up again if it comes back.';
     document.body.classList.toggle('repo-missing', message !== null);
+}
+
+function describeError(error) {
+    if (error.notRepository) {
+        return 'Not a git repository';
+    }
+    return error.repoMissing ? 'Repository not found' : `Error: ${error.message}`;
 }
 
 async function fetchJson(url) {
@@ -436,9 +450,12 @@ async function fetchJson(url) {
     const body = await response.json();
     if (!response.ok) {
         if (body.repoMissing) {
-            setRepoProblem(body.error);
+            setRepoProblem(body.error, Boolean(body.notRepository));
         }
-        throw Object.assign(new Error(body.error || `HTTP ${response.status}`), { repoMissing: Boolean(body.repoMissing) });
+        throw Object.assign(new Error(body.error || `HTTP ${response.status}`), {
+            repoMissing: Boolean(body.repoMissing),
+            notRepository: Boolean(body.notRepository),
+        });
     }
     return body;
 }
@@ -451,6 +468,11 @@ async function loadGraph() {
     setStatus('Loading…');
     try {
         const data = await fetchJson(`/api/graph?scope=${elements.scope.value}&limit=${elements.limit.value}`);
+        // A followed shell moved to another repository. Start over, so nothing from the last one is left on the page.
+        if (state.data && data.repoRoot !== state.data.repoRoot) {
+            location.reload();
+            return;
+        }
         setRepoProblem(null);
         state.data = data;
         state.fingerprint = data.fingerprint;
@@ -458,7 +480,7 @@ async function loadGraph() {
         loadBranches();
         setStatus(`Updated ${new Date().toLocaleTimeString()}`);
     } catch (error) {
-        setStatus(error.repoMissing ? 'Repository not found' : `Error: ${error.message}`);
+        setStatus(describeError(error));
     } finally {
         state.loading = false;
     }
@@ -479,7 +501,7 @@ async function poll() {
             setStatus(`Updated ${new Date().toLocaleTimeString()}`);
         }
     } catch (error) {
-        setStatus(error.repoMissing ? 'Repository not found' : `Error: ${error.message}`);
+        setStatus(describeError(error));
     }
 }
 

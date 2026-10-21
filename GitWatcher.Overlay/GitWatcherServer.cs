@@ -28,7 +28,7 @@ internal sealed class GitWatcherServer : IDisposable
 
     public Uri Address { get; }
 
-    public static async Task<GitWatcherServer> StartAsync(string serverScript, string repositoryPath)
+    public static async Task<GitWatcherServer> StartAsync(string serverScript, string repositoryPath, string? followFile)
     {
         int port = FindFreePort();
         ProcessStartInfo startInfo = new("node")
@@ -43,6 +43,11 @@ internal sealed class GitWatcherServer : IDisposable
         startInfo.ArgumentList.Add(serverScript);
         startInfo.ArgumentList.Add(repositoryPath);
         startInfo.Environment["PORT"] = port.ToString();
+
+        if (followFile is not null)
+        {
+            startInfo.Environment["GIT_WATCHER_FOLLOW_FILE"] = followFile;
+        }
 
         // The server exits by itself if this process goes away without stopping it, for example after a crash.
         startInfo.Environment["GIT_WATCHER_PARENT_PID"] = Environment.ProcessId.ToString();

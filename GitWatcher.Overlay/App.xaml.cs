@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using Microsoft.Win32;
@@ -11,6 +12,7 @@ namespace GitWatcher.Overlay;
 public partial class App : Application
 {
     private GitWatcherServer? _server;
+    private string? _followFile;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -32,6 +34,8 @@ public partial class App : Application
         // process has as its current directory.
         Environment.CurrentDirectory = AppContext.BaseDirectory;
 
+        _followFile = options.FollowFile;
+
         TerminalWindow? terminal = TerminalWindow.Find(options.TerminalWindow);
         if (terminal is null)
         {
@@ -46,7 +50,7 @@ public partial class App : Application
 
         try
         {
-            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath);
+            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath, options.FollowFile);
             window.ShowViewer(_server.Address);
         }
         catch (Exception exception)
@@ -59,7 +63,27 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _server?.Dispose();
+        DeleteFollowFile();
         base.OnExit(e);
+    }
+
+    // The shell only writes its folder while the file exists, so deleting it stops a closed overlay's shell from
+    // writing it on every change of folder.
+    private void DeleteFollowFile()
+    {
+        if (_followFile is null)
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(_followFile);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // The shell is writing it, or it's gone; it's only a temporary file.
+        }
     }
 
     private static void CloseWhenShellExits(int? shellProcessId, Window window)

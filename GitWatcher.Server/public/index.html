@@ -100,16 +100,17 @@
             </div>
         </div>
     </header>
-    <!-- Shown while the repository's folder is missing. It hides itself once the folder is back. -->
+    <!-- Shown while the repository's folder is missing, or while a followed shell is outside any repository. It hides
+         itself once there's a repository again. -->
     <div id="repo-banner" class="repo-banner" role="alert" hidden>
         <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
             <path d="M8 1.5 15 14H1z" />
             <path d="M8 6v4M8 11.75v.5" />
         </svg>
         <div>
-            <strong>Repository not found</strong>
+            <strong id="repo-banner-title">Repository not found</strong>
             <p id="repo-banner-message"></p>
-            <p class="muted">Git Watcher keeps checking and picks up again if it comes back.</p>
+            <p id="repo-banner-hint" class="muted">Git Watcher keeps checking and picks up again if it comes back.</p>
         </div>
     </div>
     <main id="workspace" class="workspace">

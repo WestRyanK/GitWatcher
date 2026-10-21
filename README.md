@@ -45,7 +45,9 @@ From PowerShell in Windows Terminal (or a classic console window), in any folder
 Start-GitWatcher
 ```
 
-Pass `-Path` to show a different repository. In Windows Terminal, this splits the current tab: a new pane on the
+Pass `-Path` to show a different repository, or `-Follow` to have the panel follow your shell: when you `cd` into
+another repository, the panel switches to it, and while you're in a folder outside any repository, it says so. In
+Windows Terminal, this splits the current tab: a new pane on the
 right reserves room for the viewer, and the panel sits exactly over that pane. Your shell's pane gets narrower, so its text wraps before the panel instead of
 going under it. The panel follows the window when you move or resize it, hides when you minimize the window or
 switch to another tab, and closes (with its pane) when you close the window or exit the shell. It works with the tab

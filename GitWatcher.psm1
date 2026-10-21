@@ -1,3 +1,26 @@
+# The file this shell writes its current folder to for a following overlay (Start-GitWatcher -Follow), and whether
+# the hook that writes it is installed.
+$script:followFile = $null
+$script:followHookInstalled = $false
+$script:previousLocationChangedAction = $null
+
+# Runs after every change of folder in this shell. The overlay deletes the file when it closes, which stops the writes.
+function Update-GitWatcherFollowFile {
+    param($LocationChangedEventArgs)
+
+    $file = $script:followFile
+    if (-not $file -or -not (Test-Path -LiteralPath $file)) {
+        return
+    }
+    $location = $LocationChangedEventArgs.NewPath
+    $folder = if ($location.Provider.Name -eq 'FileSystem') { $location.ProviderPath } else { $location.Path }
+    try {
+        [System.IO.File]::WriteAllText($file, $folder)
+    } catch {
+        # The server is reading it. The next change of folder writes it again.
+    }
+}
+
 function Start-GitWatcher {
     <#
     .SYNOPSIS
@@ -15,10 +38,19 @@ function Start-GitWatcher {
     .PARAMETER Path
         The folder whose repository to show. Defaults to the current directory.
 
+    .PARAMETER Follow
+        Keeps showing the repository of this shell's current folder: after a cd into another repository, the panel
+        shows that one, and outside any repository it says so.
+
     .EXAMPLE
         Start-GitWatcher
 
         Shows the current directory's repository next to this terminal.
+
+    .EXAMPLE
+        Start-GitWatcher -Follow
+
+        Shows the current directory's repository, and changes to another one when you cd into it.
 
     .EXAMPLE
         Set-Alias gw Start-GitWatcher
@@ -27,7 +59,8 @@ function Start-GitWatcher {
     #>
     [CmdletBinding()]
     param(
-        [string]$Path = (Get-Location).Path
+        [string]$Path = (Get-Location).Path,
+        [switch]$Follow
     )
 
     $ErrorActionPreference = 'Stop'
@@ -73,10 +106,32 @@ function Start-GitWatcher {
         $repositoryPath += '.'
     }
 
+    $arguments = "--repo `"$repositoryPath`" --shell-process $PID"
+
+    if ($Follow) {
+        # One file per shell, named for it, which the hook rewrites as this shell changes folders.
+        $script:followFile = Join-Path ([System.IO.Path]::GetTempPath()) "git-watcher-follow-$PID.txt"
+        [System.IO.File]::WriteAllText($script:followFile, $repositoryPath)
+        if (-not $script:followHookInstalled) {
+            # Keep any handler that was already there (from a profile or another module), and run it first. The new
+            # handler is made here, in the module, so it can see the module's variables and functions.
+            $script:previousLocationChangedAction = $ExecutionContext.InvokeCommand.LocationChangedAction
+            $ExecutionContext.InvokeCommand.LocationChangedAction = {
+                param($changeSource, $changeArgs)
+                if ($script:previousLocationChangedAction) {
+                    $script:previousLocationChangedAction.Invoke($changeSource, $changeArgs)
+                }
+                Update-GitWatcherFollowFile $changeArgs
+            }
+            $script:followHookInstalled = $true
+        }
+        $arguments += " --follow-file `"$($script:followFile)`""
+    }
+
     # The app finds this terminal's window through the console of its parent process, which is this shell. Passing
     # the shell's process ID closes the overlay when this shell (or its tab) closes.
     Start-Process -FilePath $executable `
-        -ArgumentList "--repo `"$repositoryPath`" --shell-process $PID" `
+        -ArgumentList $arguments `
         -WorkingDirectory (Split-Path $executable)
 }
 
