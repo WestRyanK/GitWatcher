@@ -4,6 +4,8 @@
 // Port comes from the PORT environment variable (default 4173).
 // The repository defaults to the one containing the current working directory.
 // The page's settings are saved per user in ~/.git-watcher/settings.json (or GIT_WATCHER_SETTINGS), never in the repo.
+// With GIT_WATCHER_FOLLOW_FILE set, the repository is the one containing the folder named in that file, which the
+// shell rewrites whenever it changes folders (Start-GitWatcher -Follow).
 
 'use strict';
 
@@ -42,6 +44,12 @@ const recordSeparator = '\x1e';
 
 let repoRoot = path.resolve(process.argv[2] || process.cwd());
 
+const followFile = process.env.GIT_WATCHER_FOLLOW_FILE || null;
+// The folder last read from the follow file, and that folder again while it isn't in a git repository.
+let followedFolder = null;
+let folderOutsideRepo = null;
+let followUpdate = null;
+
 // Windows won't delete or rename a folder that a running process has as its current directory, so the server
 // doesn't stay in the repository. Git still runs there, but only for as long as each command takes.
 process.chdir(__dirname);
@@ -71,6 +79,47 @@ function runGit(args) {
                 resolve(stdout);
             });
     });
+}
+
+function getToplevelOrNull(folder) {
+    return new Promise((resolve) => {
+        execFile('git', ['rev-parse', '--show-toplevel'], { cwd: folder, windowsHide: true }, (error, stdout) => {
+            resolve(error ? null : stdout.trim() || null);
+        });
+    });
+}
+
+// Moves to the repository of the folder the shell is in, once the follow file names a new folder. A folder outside
+// any repository is kept in folderOutsideRepo, so the page can say so. Requests that arrive together share one update.
+function updateFollowedFolder() {
+    if (!followFile) {
+        return Promise.resolve();
+    }
+    followUpdate ??= (async () => {
+        try {
+            let folder;
+            try {
+                folder = (await fs.promises.readFile(followFile, 'utf8')).replace(/^﻿/, '').trim();
+            } catch {
+                // Keep showing the current repository.
+                return;
+            }
+            if (!folder || folder === followedFolder) {
+                return;
+            }
+            followedFolder = folder;
+            const toplevel = await getToplevelOrNull(folder);
+            if (toplevel) {
+                repoRoot = path.resolve(toplevel);
+                folderOutsideRepo = null;
+            } else {
+                folderOutsideRepo = folder;
+            }
+        } finally {
+            followUpdate = null;
+        }
+    })();
+    return followUpdate;
 }
 
 // Says why the repository's folder can't be read (deleted, renamed, or moved), or returns null when it's there. Git
@@ -137,10 +186,11 @@ async function getHead() {
 async function getVersion() {
     const [{ raw }, head] = await Promise.all([getRefs(), getHead()]);
     const fingerprint = crypto.createHash('sha1')
+        .update(repoRoot)
         .update(raw)
         .update(`${head.hash}|${head.branch}`)
         .digest('hex');
-    return { fingerprint };
+    return { fingerprint, repoRoot };
 }
 
 // Re-encodes one part of a web address, whether or not it was already encoded (an SSH URL has raw spaces).
@@ -217,6 +267,7 @@ async function getGraph(limit, scope) {
     }
 
     const fingerprint = crypto.createHash('sha1')
+        .update(repoRoot)
         .update(raw)
         .update(`${head.hash}|${head.branch}`)
         .digest('hex');
@@ -224,6 +275,7 @@ async function getGraph(limit, scope) {
     return {
         repo: toplevel ? path.basename(toplevel) : path.basename(repoRoot),
         repoPath: toplevel || repoRoot,
+        repoRoot,
         head,
         refs,
         // The branch origin/HEAD points at ("main"), or null when the remote doesn't say.
@@ -598,6 +650,16 @@ const server = http.createServer(async (request, response) => {
         }
 
         if (url.pathname.startsWith('/api/')) {
+            await updateFollowedFolder();
+            if (folderOutsideRepo) {
+                sendJson(response, 503, {
+                    error: `${folderOutsideRepo} isn't in a git repository.`,
+                    repoMissing: true,
+                    notRepository: true,
+                    repoPath: folderOutsideRepo,
+                });
+                return;
+            }
             const repoProblem = await getRepoProblem();
             if (repoProblem) {
                 sendJson(response, 503, { error: repoProblem, repoMissing: true, repoPath: repoRoot });

@@ -7,10 +7,12 @@ namespace GitWatcher.Overlay;
 /// Command-line options:
 /// <c>--repo &lt;path&gt;</c> (default: the current directory),
 /// <c>--server &lt;path to server.js&gt;</c> (default: found above this program's folder),
-/// <c>--terminal-window &lt;hwnd&gt;</c> (default: the window of the console that started this program), and
-/// <c>--shell-process &lt;pid&gt;</c> (close the overlay when that process exits).
+/// <c>--terminal-window &lt;hwnd&gt;</c> (default: the window of the console that started this program),
+/// <c>--shell-process &lt;pid&gt;</c> (close the overlay when that process exits), and
+/// <c>--follow-file &lt;path&gt;</c> (show the repository of the folder the shell writes to that file).
 /// </summary>
-internal sealed record OverlayOptions(string RepositoryPath, string ServerScript, nint TerminalWindow, int? ShellProcessId)
+internal sealed record OverlayOptions(
+    string RepositoryPath, string ServerScript, nint TerminalWindow, int? ShellProcessId, string? FollowFile)
 {
     public static OverlayOptions Parse(string[] args)
     {
@@ -18,6 +20,7 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
         string? serverScript = null;
         nint terminalWindow = 0;
         int? shellProcessId = null;
+        string? followFile = null;
 
         for (int index = 0; index < args.Length; index++)
         {
@@ -42,6 +45,9 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
                 case "--shell-process":
                     shellProcessId = int.Parse(value, CultureInfo.InvariantCulture);
                     break;
+                case "--follow-file":
+                    followFile = Path.GetFullPath(value);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown option {name}.");
             }
@@ -59,7 +65,7 @@ internal sealed record OverlayOptions(string RepositoryPath, string ServerScript
             throw new ArgumentException($"The folder {repositoryPath} doesn't exist.");
         }
 
-        return new OverlayOptions(repositoryPath, serverScript, terminalWindow, shellProcessId);
+        return new OverlayOptions(repositoryPath, serverScript, terminalWindow, shellProcessId, followFile);
     }
 
     private static nint ParseHandle(string value)
