@@ -26,10 +26,10 @@ const settingKeyPattern = /^git-watcher.[\w.-]{1,100}$/;
 
 // Only these git subcommands are ever run. All of them are read-only. `status` normally refreshes the index,
 // but GIT_OPTIONAL_LOCKS=0 (set in runGit) stops it from writing. `ls-remote` is only run with `--get-url`, which
-// prints the configured URL without contacting the remote.
+// prints the configured URL without contacting the remote. `worktree` is only run as `worktree list`.
 const allowedGitCommands = new Set([
     'log', 'rev-list', 'for-each-ref', 'rev-parse', 'symbolic-ref', 'show', 'diff-tree', 'status', 'ls-remote',
-    'diff',
+    'diff', 'worktree',
 ]);
 
 // Which commits to include, as git revision arguments.
@@ -55,8 +55,8 @@ let followUpdate = null;
 process.chdir(__dirname);
 
 function runGit(args) {
-    if (!allowedGitCommands.has(args[0])) {
-        return Promise.reject(new Error(`git ${args[0]} is not allowed`));
+    if (!allowedGitCommands.has(args[0]) || (args[0] === 'worktree' && args[1] !== 'list')) {
+        return Promise.reject(new Error(`git ${args.slice(0, 2).join(' ')} is not allowed`));
     }
 
     return new Promise((resolve, reject) => {
@@ -349,6 +349,7 @@ async function getBranches() {
         getTags(),
     ]);
     const currentWorktree = toplevel ? path.resolve(toplevel).toLowerCase() : null;
+    const worktrees = await getWorktrees(currentWorktree);
 
     const local = [];
     const remote = [];
@@ -384,7 +385,64 @@ async function getBranches() {
             });
         }
     }
-    return { local, remote, tags };
+    return { local, remote, tags, worktrees };
+}
+
+// Lists the repository's worktrees, the main one first, from `git worktree list --porcelain`. Each has the branch
+// checked out in it, or none when its HEAD is detached, and its HEAD commit's date and subject. The one the viewer
+// runs in is marked current.
+async function getWorktrees(currentWorktree) {
+    const output = await runGit(['worktree', 'list', '--porcelain']);
+    const worktrees = [];
+    let worktree = null;
+    for (const line of output.split('\n')) {
+        if (line.startsWith('worktree ')) {
+            worktree = {
+                path: line.slice('worktree '.length),
+                hash: null,
+                branch: null,
+                bare: false,
+                locked: false,
+                prunable: false,
+                current: false,
+            };
+            worktrees.push(worktree);
+        } else if (!worktree) {
+            continue;
+        } else if (line.startsWith('HEAD ')) {
+            worktree.hash = line.slice('HEAD '.length);
+        } else if (line.startsWith('branch ')) {
+            worktree.branch = line.slice('branch '.length).replace(/^refs\/heads\//, '');
+        } else if (line === 'bare') {
+            worktree.bare = true;
+        } else if (line === 'locked' || line.startsWith('locked ')) {
+            worktree.locked = true;
+        } else if (line === 'prunable' || line.startsWith('prunable ')) {
+            worktree.prunable = true;
+        }
+    }
+    for (const entry of worktrees) {
+        entry.current = currentWorktree !== null && path.resolve(entry.path).toLowerCase() === currentWorktree;
+    }
+
+    // One lookup for every worktree's HEAD commit. A bare worktree has no HEAD commit.
+    const hashes = [...new Set(worktrees.map((entry) => entry.hash).filter(Boolean))];
+    const commits = new Map();
+    if (hashes.length > 0) {
+        const format = ['%H', '%ct', '%an', '%s'].join(fieldSeparator);
+        const log = await runGitOrNull(['log', '--no-walk=unsorted', `--format=${format}`, ...hashes, '--']);
+        for (const line of (log || '').split('\n')) {
+            if (!line) {
+                continue;
+            }
+            const [hash, timestamp, author, subject] = line.split(fieldSeparator);
+            commits.set(hash, { date: Number(timestamp) * 1000, author, subject });
+        }
+    }
+    return worktrees.map((entry) => ({
+        ...entry,
+        ...(commits.get(entry.hash) || { date: null, author: null, subject: null }),
+    }));
 }
 
 // Lists the tags by name. An annotated tag points at a tag object, so its hash is the commit it peels to, and its

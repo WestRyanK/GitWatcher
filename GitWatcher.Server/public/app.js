@@ -1011,10 +1011,12 @@ function setTagGrouping(grouping) {
     renderBranches();
 }
 
-// The Remote branches and Tags nodes are closed by default, unlike the branch folders, so each has its own setting.
+// The Remote branches, Tags, and Worktrees nodes are closed by default, unlike the branch folders, so each has its
+// own setting.
 const closedByDefaultNodes = {
     remote: 'git-watcher.remote-branches-open',
     tags: 'git-watcher.tags-open',
+    worktrees: 'git-watcher.worktrees-open',
 };
 
 // Branch folders collapsed by the user, by path ("local:claude", "remote:origin/claude"). Folders are open by default.
@@ -1138,6 +1140,62 @@ function createTagItem(tag, displayName = tag.name, depth = 0) {
     return item;
 }
 
+// A worktree row is named for its folder, with the branch checked out in it as a tag, and the current worktree's
+// marker on the one the viewer runs in. A bare worktree has no commit to jump to.
+function createWorktreeItem(worktree, displayName = worktree.name, depth = 0) {
+    const item = createElement('button', 'branch-item worktree-item');
+    item.type = 'button';
+    indentBranchRow(item, depth);
+    item.dataset.hash = worktree.hash || '';
+    item.dataset.name = `worktree:${worktree.path}`;
+    item.dataset.refName = worktree.branch || worktree.hash || '';
+    item.dataset.path = worktree.path;
+    item.dataset.kind = 'worktree';
+    item.classList.toggle('current', Boolean(worktree.current));
+    item.classList.toggle('selected', item.dataset.name === state.selectedBranch);
+    const where = worktree.bare ? 'Bare repository'
+        : worktree.branch ? `Branch: ${worktree.branch}` : `Detached at ${(worktree.hash || '').slice(0, 8)}`;
+    item.title = [
+        worktree.path,
+        where,
+        worktree.hash ? `${worktree.hash.slice(0, 8)} ${worktree.subject}` : null,
+        worktree.author ? `${worktree.author}, ${formatDate(worktree.date)}` : null,
+        worktree.locked ? 'Locked' : null,
+        worktree.prunable ? 'Prunable: its folder is gone' : null,
+    ].filter(Boolean).join('\n');
+
+    const line = createElement('span', 'branch-line');
+    if (worktree.current) {
+        const marker = createElement('span', 'current-marker');
+        marker.title = 'The worktree the viewer runs in';
+        line.appendChild(marker);
+    }
+    line.appendChild(createElement('span', 'branch-name', `📁 ${displayName}`));
+    const tags = [];
+    if (worktree.bare) {
+        tags.push({ className: '', text: 'bare', title: 'A bare repository, with no working tree' });
+    } else if (worktree.branch) {
+        tags.push({ className: 'branch', text: worktree.branch, title: `Branch ${worktree.branch} is checked out here` });
+    } else {
+        tags.push({ className: '', text: 'detached', title: `Detached HEAD at ${(worktree.hash || '').slice(0, 8)}` });
+    }
+    if (worktree.locked) {
+        tags.push({ className: '', text: 'locked', title: 'Locked, so git worktree prune leaves it alone' });
+    }
+    if (worktree.prunable) {
+        tags.push({ className: 'gone', text: 'prunable', title: 'Its folder is gone; git worktree prune removes it' });
+    }
+    for (const tag of tags) {
+        const tagElement = createElement('span', `branch-tag ${tag.className}`.trim(), tag.text);
+        tagElement.title = tag.title;
+        line.appendChild(tagElement);
+    }
+    item.appendChild(line);
+    const subject = worktree.hash ? `${formatDate(worktree.date)} · ${worktree.subject}` : worktree.path;
+    item.appendChild(createElement('span', 'branch-subject', subject));
+    return item;
+}
+
 function renderBranches() {
     const data = state.branches;
     if (!data) {
@@ -1145,6 +1203,11 @@ function renderBranches() {
     }
     const query = elements.branchFilter.value.trim().toLowerCase();
     const matches = (branch) => query === '' || branch.name.toLowerCase().includes(query);
+    // A worktree matches by its folder, its branch, or its full path.
+    const worktrees = (data.worktrees || [])
+        .map((worktree) => ({ ...worktree, name: worktree.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || worktree.path }))
+        .filter((worktree) => query === '' || [worktree.name, worktree.branch || '', worktree.path]
+            .some((text) => text.toLowerCase().includes(query)));
 
     // The current branch first, then the most recently updated.
     const local = data.local.filter(matches).sort((a, b) => Number(b.current) - Number(a.current) || b.date - a.date);
@@ -1156,8 +1219,8 @@ function renderBranches() {
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     const fragment = document.createDocumentFragment();
 
-    // The tree has a top-level node each for the local branches, the remote branches, and the tags. Branches starts
-    // open. Remote branches and Tags start closed, because a repository can have many of them. While filtering,
+    // The tree has a top-level node each for the local branches, the remote branches, the tags, and the worktrees.
+    // Branches starts open. The others start closed, because a repository can have many of them. While filtering,
     // every node with a match is open.
     const appendRootNode = (name, path, items, open, pathPrefix, createItem, separator = '/') => {
         if (items.length === 0) {
@@ -1175,8 +1238,10 @@ function renderBranches() {
     appendRootNode('Branches', 'branches', local, !collapsedFolders.has('branches'), 'local:', createBranchItem);
     appendRootNode('Remote branches', 'remote', remote, openByDefault('remote'), 'remote:', createBranchItem);
     appendRootNode('Tags', 'tags', tags, openByDefault('tags'), 'tags:', createTagItem, tagSeparators[elements.tagGrouping.value]);
-    if (local.length === 0 && remote.length === 0 && tags.length === 0) {
-        fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches or tags match.' : 'No branches.'));
+    // Worktrees aren't grouped into folders: the main one comes first, then the others in git's order.
+    appendRootNode('Worktrees', 'worktrees', worktrees, openByDefault('worktrees'), 'worktrees:', createWorktreeItem, null);
+    if (local.length === 0 && remote.length === 0 && tags.length === 0 && worktrees.length === 0) {
+        fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches, tags, or worktrees match.' : 'No branches.'));
     }
 
     const scrollTop = elements.branches.scrollTop;
@@ -1224,7 +1289,10 @@ elements.branches.addEventListener('click', (event) => {
         selected.classList.remove('selected');
     }
     item.classList.add('selected');
-    selectCommit(item.dataset.hash, true);
+    // A bare worktree has no commit.
+    if (item.dataset.hash) {
+        selectCommit(item.dataset.hash, true);
+    }
 });
 
 function statusClass(code) {
@@ -1455,6 +1523,21 @@ elements.branches.addEventListener('contextmenu', (event) => {
     }
     const name = item.dataset.refName;
     const kind = item.dataset.kind;
+    if (kind === 'worktree') {
+        const worktreePath = item.dataset.path;
+        const actions = [
+            { label: 'Copy path', action: () => copyWithStatus(() => worktreePath, 'the worktree path') },
+        ];
+        if (item.dataset.hash) {
+            actions.push({ label: 'Go to commit', action: () => selectCommit(item.dataset.hash, true) });
+        }
+        if (name) {
+            const noun = item.dataset.hash === name ? 'commit' : 'branch';
+            actions.push({ label: `Copy ${noun} name`, action: () => copyWithStatus(() => name, `the ${noun} name`) });
+        }
+        openContextMenu(event, item, actions);
+        return;
+    }
     const noun = kind === 'tag' ? 'tag' : 'branch';
     // A remote branch is checked out as a new local branch that tracks it. A tag is checked out as a detached HEAD.
     const checkout = kind === 'remote' ? `git checkout --track ${name}` : `git checkout ${name}`;

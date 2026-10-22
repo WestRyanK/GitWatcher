@@ -105,11 +105,13 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
   without the author and date.
 * **Sidebar:** **Branches** and **Status** open and close separately from the buttons on the sidebar's rail, which
   is always visible. With both open, they're stacked.
-  - **Branches** shows a tree with **Branches**, **Remote branches**, and **Tags** nodes. Branches are in folders by
-    name (`claude/...` under **claude**), with each local branch's upstream, ahead/behind counts, and the worktree
-    it's checked out in. Tags are grouped by slashes, by hyphens (`MyApp-v2026.10.02` under **MyApp**), or not at
-    all: choose with **Group tags by** in the **Options** menu or by right-clicking the **Tags** node. Click a branch
-    or tag to jump to its commit.
+  - **Branches** shows a tree with **Branches**, **Remote branches**, **Tags**, and **Worktrees** nodes. Branches
+    are in folders by name (`claude/...` under **claude**), with each local branch's upstream, ahead/behind counts,
+    and the worktree it's checked out in. Tags are grouped by slashes, by hyphens (`MyApp-v2026.10.02` under
+    **MyApp**), or not at all: choose with **Group tags by** in the **Options** menu or by right-clicking the
+    **Tags** node. Worktrees are listed by folder, main one first, each with the branch checked out in it (or
+    `detached`), its HEAD commit, and a marker on the one the viewer runs in. Click a branch, tag, or worktree to
+    jump to its commit; right-click a worktree to copy its path.
   - **Status** lists conflicted, staged, unstaged, and untracked files for the folder the viewer runs in.
 * **Diffs:** click a file in **Commit details** or in the **Status** pane to see its diff, in a view over the
   Commits pane.
@@ -213,7 +215,7 @@ language, add its file from `https://cdnjs.cloudflare.com/ajax/libs/highlight.js
 * `GET /api/version` returns a fingerprint of the refs and HEAD. The page polls it every 3 seconds and reloads the
   graph when it changes. This covers new commits, branch moves, and checkouts.
 * `GET /api/branches` returns local and remote branches from `git for-each-ref`, with upstreams, ahead/behind
-  counts, and worktrees, plus every tag.
+  counts, and worktrees, plus every tag, plus the worktrees from `git worktree list` with their HEAD commits.
 * `GET /api/status` returns `git status --porcelain=v2 --branch`. The **Status** pane polls it with the graph.
 * `GET /api/commit/<hash>` returns the commit's message and its changed files. A merge's files are compared with
   its first parent.
