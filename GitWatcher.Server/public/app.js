@@ -341,19 +341,27 @@ function buildRefBadges(data) {
         badgesByHash.get(hash).push(badge);
     };
 
+    // The default branch, and its copy on origin, come before every other label, picked the same way as in
+    // findMainBranch.
+    const isMainRef = (ref, name) =>
+        (ref.type === 'branch' && ref.name === name) || (ref.type === 'remote' && ref.name === `origin/${name}`);
+    const mainName = [data.defaultBranch, 'main', 'master']
+        .find((name) => name && data.refs.some((ref) => isMainRef(ref, name)));
+
     const order = { head: 0, branch: 1, remote: 2, tag: 3 };
     for (const ref of data.refs) {
+        const main = isMainRef(ref, mainName);
         if (ref.type === 'branch' && ref.name === data.head.branch) {
-            add(ref.hash, { type: 'head', label: `HEAD → ${ref.name}` });
+            add(ref.hash, { type: 'head', label: `HEAD → ${ref.name}`, main });
         } else {
-            add(ref.hash, { type: ref.type, label: ref.type === 'tag' ? `🏷 ${ref.name}` : ref.name });
+            add(ref.hash, { type: ref.type, label: ref.type === 'tag' ? `🏷 ${ref.name}` : ref.name, main });
         }
     }
     if (data.head.hash && !data.head.branch) {
-        add(data.head.hash, { type: 'head', label: 'HEAD (detached)' });
+        add(data.head.hash, { type: 'head', label: 'HEAD (detached)', main: false });
     }
     for (const badges of badgesByHash.values()) {
-        badges.sort((a, b) => order[a.type] - order[b.type] || a.label.localeCompare(b.label));
+        badges.sort((a, b) => b.main - a.main || order[a.type] - order[b.type] || a.label.localeCompare(b.label));
     }
     return badgesByHash;
 }
