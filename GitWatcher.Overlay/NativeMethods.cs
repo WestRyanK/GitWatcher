@@ -24,6 +24,10 @@ internal static class NativeMethods
     public const uint SetWindowPosNoZOrder = 0x0004;
     public const uint SetWindowPosNoActivate = 0x0010;
 
+    public const uint InputKeyboard = 1;
+    public const uint KeyEventExtendedKey = 0x0001;
+    public const uint KeyEventKeyUp = 0x0002;
+
     public delegate void WinEventProc(
         nint hook,
         uint eventType,
@@ -47,6 +51,46 @@ internal static class NativeMethods
     {
         public int X;
         public int Y;
+    }
+
+    // INPUT holds a union of mouse, keyboard, and hardware input. The mouse input is the largest, so it sets the
+    // size, even though only keyboard input is sent.
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Input
+    {
+        public uint Type;
+        public InputUnion Union;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InputUnion
+    {
+        [FieldOffset(0)]
+        public MouseInput Mouse;
+
+        [FieldOffset(0)]
+        public KeyboardInput Keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public nint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KeyboardInput
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public nint ExtraInfo;
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -90,6 +134,13 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint attachThread, uint attachToThread, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetClientRect(nint window, out Rect rect);
 
     [DllImport("user32.dll")]
@@ -106,6 +157,12 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint count, Input[] inputs, int size);
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int virtualKey);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

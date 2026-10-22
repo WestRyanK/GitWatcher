@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
@@ -12,7 +14,7 @@ internal sealed class TerminalWindow
     private const string WindowsTerminalClassName = "CASCADIA_HOSTING_WINDOW_CLASS";
 
     // Windows Terminal reports each terminal pane to UI Automation with this class name.
-    private const string TerminalPaneClassName = "TermControl";
+    public const string TerminalPaneClassName = "TermControl";
 
     // Windows Terminal's usual tab row height, used only when the tab row can't be measured.
     private const double WindowsTerminalTabRowHeight = 40;
@@ -118,6 +120,62 @@ internal sealed class TerminalWindow
     }
 
     /// <summary>
+    /// Gives the keyboard focus to the pane with the given title, which makes it the active pane of its tab, and
+    /// returns whether it could. This is a cross-process call, so call it off the UI thread.
+    /// </summary>
+    public bool FocusPane(string paneTitle)
+    {
+        try
+        {
+            AutomationElement? pane = FindPane(paneTitle);
+            if (pane is null)
+            {
+                return false;
+            }
+
+            pane.SetFocus();
+            return true;
+        }
+        catch (Exception exception) when (exception is ElementNotAvailableException or COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns whether the pane with the given title has the keyboard focus. This is a cross-process call, so call
+    /// it off the UI thread.
+    /// </summary>
+    public bool PaneHasFocus(string paneTitle)
+    {
+        try
+        {
+            return FindPane(paneTitle)?.Current.HasKeyboardFocus == true;
+        }
+        catch (Exception exception) when (exception is ElementNotAvailableException or COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets the path of the program that owns the window, such as WindowsTerminal.exe, or null if it can't be read.
+    /// </summary>
+    public string? GetExecutablePath()
+    {
+        NativeMethods.GetWindowThreadProcessId(Handle, out uint processId);
+        try
+        {
+            using Process process = Process.GetProcessById((int)processId);
+            return process.MainModule?.FileName;
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Gets the window's visible client area in screen coordinates.
     /// </summary>
     public bool TryGetBounds(out PixelRect bounds)
@@ -172,6 +230,16 @@ internal sealed class TerminalWindow
         {
             NativeMethods.FreeConsole();
         }
+    }
+
+    // Only the active tab's panes are in the tree, so a pane in another tab isn't found.
+    private AutomationElement? FindPane(string paneTitle)
+    {
+        AutomationElement window = AutomationElement.FromHandle(Handle);
+        AndCondition isTitledPane = new(
+            new PropertyCondition(AutomationElement.ClassNameProperty, TerminalPaneClassName),
+            new PropertyCondition(AutomationElement.NameProperty, paneTitle));
+        return window.FindFirst(TreeScope.Descendants, isTitledPane);
     }
 
     private static string GetClassName(nint window)
