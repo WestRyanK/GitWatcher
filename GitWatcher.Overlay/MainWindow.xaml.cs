@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -55,6 +56,12 @@ public partial class MainWindow : Window
     private bool _hiddenWithTab;
 
     private Uri? _viewerAddress;
+
+    // Windows Terminal's layout keys, such as Alt+Shift+arrow keys, by the names the page uses for them.
+    private IReadOnlyDictionary<string, KeyChord> _forwardedKeys = new Dictionary<string, KeyChord>();
+    private string? _terminalExecutable;
+    private FileSystemWatcher? _terminalSettingsWatcher;
+    private bool _forwardingKey;
 
     internal MainWindow(TerminalWindow terminal, OverlaySettings settings)
     {
@@ -115,6 +122,11 @@ public partial class MainWindow : Window
         _measuredTopInset = _terminal.MeasureLayout(null).TopInset;
         _layoutTimer.Start();
         SetCollapsed(_settings.Collapsed);
+
+        if (_terminal.IsWindowsTerminal)
+        {
+            WatchTerminalKeyBindings();
+        }
     }
 
     private async void OnLayoutTimerTick(object? sender, EventArgs e)
@@ -166,6 +178,7 @@ public partial class MainWindow : Window
                 ClosePlaceholder();
                 _placeholderUnavailable = true;
                 ResizeGrip.Visibility = Visibility.Visible;
+                SendForwardedKeys();
                 ShowOverlay();
             }
             else if (_placeholderSeen)
@@ -179,7 +192,8 @@ public partial class MainWindow : Window
     }
 
     // The page's toolbar has the overlay's minimize and close buttons, so the overlay needs no header row of its own.
-    // It sends "minimize" or "close" with window.chrome.webview.postMessage. Messages from any other page are ignored.
+    // It sends "minimize" or "close" with window.chrome.webview.postMessage, and { terminalKey } for a key to forward
+    // to Windows Terminal. Messages from any other page are ignored.
     private void OnViewerWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (_viewerAddress is null
@@ -189,15 +203,147 @@ public partial class MainWindow : Window
             return;
         }
 
-        string? command = e.TryGetWebMessageAsString();
-        if (command == "minimize")
+        using JsonDocument message = JsonDocument.Parse(e.WebMessageAsJson);
+        JsonElement root = message.RootElement;
+        if (root.ValueKind == JsonValueKind.String)
         {
-            Collapse();
+            string? command = root.GetString();
+            if (command == "minimize")
+            {
+                Collapse();
+            }
+            else if (command == "close")
+            {
+                Close();
+            }
         }
-        else if (command == "close")
+        else if (root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("terminalKey", out JsonElement key)
+            && key.ValueKind == JsonValueKind.String)
         {
-            Close();
+            ForwardTerminalKey(key.GetString()!);
         }
+    }
+
+    // Windows Terminal's layout keys, such as Alt+Shift+arrow keys to resize the pane, would do nothing while the
+    // overlay has the keyboard. The page sends the ones it doesn't use itself here, to be forwarded to the
+    // placeholder pane. The bindings are read from Windows Terminal's settings, and again whenever they change.
+    private void WatchTerminalKeyBindings()
+    {
+        _terminalExecutable = _terminal.GetExecutablePath();
+        if (_terminalExecutable is null)
+        {
+            return;
+        }
+
+        LoadTerminalKeyBindings();
+        string settingsPath = TerminalKeyBindings.GetSettingsPath(_terminalExecutable);
+        string? settingsDirectory = Path.GetDirectoryName(settingsPath);
+        if (settingsDirectory is null || !Directory.Exists(settingsDirectory))
+        {
+            return;
+        }
+
+        // Windows Terminal may save by replacing the file, so a rename counts as a change too.
+        _terminalSettingsWatcher = new FileSystemWatcher(settingsDirectory, Path.GetFileName(settingsPath))
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
+        };
+        _terminalSettingsWatcher.Changed += (_, _) => Dispatcher.BeginInvoke(LoadTerminalKeyBindings);
+        _terminalSettingsWatcher.Created += (_, _) => Dispatcher.BeginInvoke(LoadTerminalKeyBindings);
+        _terminalSettingsWatcher.Renamed += (_, _) => Dispatcher.BeginInvoke(LoadTerminalKeyBindings);
+        _terminalSettingsWatcher.EnableRaisingEvents = true;
+    }
+
+    private void LoadTerminalKeyBindings()
+    {
+        // Settings that can't be read right now, for example while they're being saved, keep the last bindings.
+        if (_terminalExecutable is not null && TerminalKeyBindings.Load(_terminalExecutable) is IReadOnlySet<KeyChord> keys)
+        {
+            _forwardedKeys = keys.ToDictionary(key => key.ToString());
+            SendForwardedKeys();
+        }
+    }
+
+    // Tells the page which keys to send back. Without a placeholder pane, there's nothing to forward them to.
+    private void SendForwardedKeys()
+    {
+        if (Viewer.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        IEnumerable<string> keys = _placeholderUnavailable ? [] : _forwardedKeys.Keys;
+        Viewer.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new { terminalKeys = keys }));
+    }
+
+    private async void ForwardTerminalKey(string name)
+    {
+        if (_placeholder is null || _forwardingKey || !_forwardedKeys.TryGetValue(name, out KeyChord chord))
+        {
+            return;
+        }
+
+        _forwardingKey = true;
+        try
+        {
+            // The overlay is the foreground window, so it may give the foreground to the terminal. Focusing the
+            // placeholder pane makes it the active pane, so the chord acts on it, as if it had been pressed there.
+            string paneTitle = _placeholder.Title;
+            NativeMethods.SetForegroundWindow(_terminal.Handle);
+            if (!await Task.Run(() => _terminal.FocusPane(paneTitle)))
+            {
+                ActivateViewer();
+                return;
+            }
+
+            KeySender.SendChord(chord);
+
+            // While the modifiers are held, the chord's repeats, and any other chord, go straight to the terminal.
+            // Once they're released, take the keyboard back, unless the chord moved the focus away from the
+            // placeholder pane, for example to the shell's pane or to a new pane.
+            while (KeySender.HeldModifiers != KeyModifiers.None)
+            {
+                await Task.Delay(50);
+            }
+
+            await Task.Delay(100);
+            if (_placeholder?.Title == paneTitle
+                && NativeMethods.GetForegroundWindow() == _terminal.Handle
+                && await Task.Run(() => _terminal.PaneHasFocus(paneTitle)))
+            {
+                ActivateViewer();
+            }
+        }
+        finally
+        {
+            _forwardingKey = false;
+        }
+    }
+
+    // Windows lets only the foreground window's process move the foreground. Sharing the foreground window's input
+    // state for a moment lets the overlay take it back from the terminal.
+    private void ActivateViewer()
+    {
+        nint foreground = NativeMethods.GetForegroundWindow();
+        uint foregroundThread = NativeMethods.GetWindowThreadProcessId(foreground, out _);
+        uint thread = NativeMethods.GetCurrentThreadId();
+        bool attached = foregroundThread != 0
+            && foregroundThread != thread
+            && NativeMethods.AttachThreadInput(thread, foregroundThread, true);
+        try
+        {
+            NativeMethods.SetForegroundWindow(_handle);
+        }
+        finally
+        {
+            if (attached)
+            {
+                NativeMethods.AttachThreadInput(thread, foregroundThread, false);
+            }
+        }
+
+        Viewer.Focus();
     }
 
     private void OnViewerInitializationCompleted(object? sender, CoreWebView2InitializationCompletedEventArgs e)
@@ -209,6 +355,9 @@ public partial class MainWindow : Window
         }
 
         Viewer.CoreWebView2.NewWindowRequested += OnViewerNewWindowRequested;
+
+        // The page forgets the keys to forward when it reloads, so send them with every load.
+        Viewer.CoreWebView2.NavigationCompleted += (_, _) => SendForwardedKeys();
     }
 
     // The page opens web pages, such as a commit in Azure DevOps, in a new window. Open them in the default browser
@@ -323,6 +472,7 @@ public partial class MainWindow : Window
     {
         _layoutTimer.Stop();
         _tracker?.Dispose();
+        _terminalSettingsWatcher?.Dispose();
         ClosePlaceholder();
         Viewer.Dispose();
     }

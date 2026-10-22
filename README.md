@@ -55,6 +55,11 @@ row hidden too (quake mode, focus mode, or full screen).
 
 * **Width:** resize the pane with Windows Terminal's pane resizing (Alt+Shift+arrow keys by default). The panel
   follows it, and the next pane opens at the same width.
+* **Terminal shortcuts:** while the panel has the keyboard, Windows Terminal's shortcuts for panes, tabs, and the
+  window (resizing or moving focus between panes, zoom, full screen, switching tabs, and so on) still work: the
+  panel passes them to its pane, as if you'd pressed them there. It reads your key bindings from Windows Terminal's
+  settings, so your own shortcuts work too. A shortcut the viewer uses itself, such as Alt+Up and Alt+Down in a
+  diff, stays with the viewer.
 * **Minimize:** the panel's minimize button closes the pane, so your shell gets its full width back, and leaves a
   small button in the terminal's top-right corner. Click it to split the pane again and reopen the panel. Closing the
   pane yourself does the same as minimizing. The viewer keeps running while it's minimized, so it reopens instantly.

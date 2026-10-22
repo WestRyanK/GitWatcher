@@ -1576,6 +1576,32 @@ if (webViewHost) {
     document.getElementById('host-controls').hidden = false;
     document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
     document.getElementById('host-close').addEventListener('click', () => webViewHost.postMessage('close'));
+
+    // Windows Terminal's layout keys, such as Alt+Shift+arrow keys to resize the pane, come to the page while it has
+    // the keyboard. The overlay says which keys it forwards to the terminal, named by their modifiers and key code,
+    // such as "alt+shift+72". The page sends those back, unless something on the page already used the key.
+    let terminalKeys = new Set();
+    webViewHost.addEventListener('message', (event) => {
+        if (Array.isArray(event.data?.terminalKeys)) {
+            terminalKeys = new Set(event.data.terminalKeys);
+        }
+    });
+    window.addEventListener('keydown', (event) => {
+        if (event.defaultPrevented) {
+            return;
+        }
+        const modifiers = [
+            event.ctrlKey && 'ctrl',
+            event.altKey && 'alt',
+            event.shiftKey && 'shift',
+            event.metaKey && 'win',
+        ];
+        const name = [...modifiers.filter(Boolean), event.keyCode].join('+');
+        if (terminalKeys.has(name)) {
+            event.preventDefault();
+            webViewHost.postMessage({ terminalKey: name });
+        }
+    });
 }
 
 // The Options menu holds the commit filter and the graph settings.
