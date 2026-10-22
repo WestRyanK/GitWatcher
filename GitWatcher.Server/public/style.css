@@ -714,6 +714,17 @@ body.resizing.resizing-rows {
     color: var(--deleted);
 }
 
+/* A worktree's branch tag is the row's point, so it can shrink with an ellipsis instead of staying full width. */
+.branch-tag.branch {
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 2em;
+    color: var(--branch-fg);
+    background: var(--branch-bg);
+}
+
 .branch-subject {
     display: block;
     overflow: hidden;
