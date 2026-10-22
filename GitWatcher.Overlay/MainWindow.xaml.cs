@@ -62,6 +62,7 @@ public partial class MainWindow : Window
     private string? _terminalExecutable;
     private FileSystemWatcher? _terminalSettingsWatcher;
     private bool _forwardingKey;
+    private PaneFocusTracker? _paneFocusTracker;
 
     internal MainWindow(TerminalWindow terminal, OverlaySettings settings)
     {
@@ -126,6 +127,28 @@ public partial class MainWindow : Window
         if (_terminal.IsWindowsTerminal)
         {
             WatchTerminalKeyBindings();
+            _paneFocusTracker = new PaneFocusTracker(_terminal.Handle);
+            _paneFocusTracker.PaneFocused += (_, paneTitle) => Dispatcher.BeginInvoke(() => OnTerminalPaneFocused(paneTitle));
+        }
+    }
+
+    // The placeholder pane can get the keyboard focus, for example when the user moves the focus to it from the
+    // shell's pane with Windows Terminal's shortcuts. The overlay covers it, so the overlay takes the keyboard instead.
+    private async void OnTerminalPaneFocused(string paneTitle)
+    {
+        if (_placeholder?.Title != paneTitle || _forwardingKey)
+        {
+            return;
+        }
+
+        // A new placeholder pane has the focus for a moment before it goes back to the shell. Wait for it to settle.
+        await Task.Delay(150);
+        if (_placeholder?.Title == paneTitle
+            && !_forwardingKey
+            && NativeMethods.GetForegroundWindow() == _terminal.Handle
+            && await Task.Run(() => _terminal.PaneHasFocus(paneTitle)))
+        {
+            ActivateViewer();
         }
     }
 
@@ -473,6 +496,7 @@ public partial class MainWindow : Window
         _layoutTimer.Stop();
         _tracker?.Dispose();
         _terminalSettingsWatcher?.Dispose();
+        _paneFocusTracker?.Dispose();
         ClosePlaceholder();
         Viewer.Dispose();
     }

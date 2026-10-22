@@ -14,7 +14,7 @@ internal sealed class TerminalWindow
     private const string WindowsTerminalClassName = "CASCADIA_HOSTING_WINDOW_CLASS";
 
     // Windows Terminal reports each terminal pane to UI Automation with this class name.
-    private const string TerminalPaneClassName = "TermControl";
+    public const string TerminalPaneClassName = "TermControl";
 
     // Windows Terminal's usual tab row height, used only when the tab row can't be measured.
     private const double WindowsTerminalTabRowHeight = 40;
