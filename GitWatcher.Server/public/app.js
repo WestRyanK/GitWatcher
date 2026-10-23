@@ -1330,6 +1330,12 @@ for (const { body, rows, startAtTop } of Object.values(keyboardPanes)) {
             } else {
                 list[next]?.focus();
             }
+        } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+            // The browser pages by nearly the whole pane, which loses your place in a short pane. Half keeps some of
+            // what was in view.
+            event.preventDefault();
+            const direction = event.key === 'PageDown' ? 1 : -1;
+            body.scrollBy({ top: direction * body.clientHeight / 2, behavior: 'smooth' });
         } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
             event.preventDefault();
             const folder = event.target.closest('.branch-folder');
