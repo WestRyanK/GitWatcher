@@ -534,7 +534,7 @@ function selectCommit(hash, scrollIntoView) {
 }
 
 async function showDetails(hash) {
-    elements.details.replaceChildren(createElement('p', 'muted', 'Loading…'));
+    replaceKeepingFocus(elements.details, createElement('p', 'muted', 'Loading…'));
     try {
         let details = state.detailsCache.get(hash);
         if (!details) {
@@ -545,7 +545,7 @@ async function showDetails(hash) {
             renderDetails(details);
         }
     } catch (error) {
-        elements.details.replaceChildren(createElement('p', 'muted', `Error: ${error.message}`));
+        replaceKeepingFocus(elements.details, createElement('p', 'muted', `Error: ${error.message}`));
     }
 }
 
@@ -656,6 +656,7 @@ function renderDetails(details) {
         const item = createElement('li');
         const button = createElement('button', 'file-item');
         button.type = 'button';
+        button.dataset.focusKey = `file:${file.path}`;
         button.title = 'Show the diff';
         button.appendChild(createElement('span', `status status-${file.status}`, file.status));
         const pathText = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
@@ -666,7 +667,7 @@ function renderDetails(details) {
     });
     container.appendChild(files);
 
-    elements.details.replaceChildren(container);
+    replaceKeepingFocus(elements.details, container);
 }
 
 const settingKeys = {
@@ -1242,9 +1243,10 @@ elements.branches.addEventListener('click', (event) => {
     selectCommit(item.dataset.hash, true);
 });
 
-// The keyboard is in the graph unless it's in the Branches or Status pane. B and S move it to their pane, and Escape
-// brings it back. In a pane, Up and Down move between the rows, and Enter, a button's own key, acts on the row: it
-// goes to a branch's commit, opens or closes a folder, or opens a file's diff. In the Branches pane, Left and Right
+// The keyboard is in the graph unless it's in the Branches, Status, or Commit details pane. B, S, and D (or Enter for
+// the details) move it to their pane, and Escape brings it back. In a pane, Up and Down move between the rows, and
+// Enter, a button's own key, acts on the row: it goes to a branch's commit, opens or closes a folder, or opens a
+// file's diff. In the Branches pane, Left and Right
 // also close and open folders. The arrows stay in the pane, so they don't also move through the graph.
 const keyboardPanes = {
     'branches-pane': {
@@ -1254,6 +1256,9 @@ const keyboardPanes = {
         start: ['.branch-item.selected', '.branch-item.current'],
     },
     'working-tree-pane': { body: elements.workingTree, rows: '.status-item', start: [] },
+    // The details start at the top, with the message in view: Page Up and Page Down scroll, Down goes to the changed
+    // files, and Up from the first file goes back to the top.
+    'details-pane': { body: elements.details, rows: '.file-item', start: [], startAtTop: true },
 };
 
 // Redrawing a pane replaces its rows. The row that had the focus gets it back, found by its data-focus-key, or the
@@ -1275,7 +1280,12 @@ function focusGraph() {
 }
 
 function focusPane(paneId) {
-    const { body, rows, start } = keyboardPanes[paneId];
+    const { body, rows, start, startAtTop } = keyboardPanes[paneId];
+    if (startAtTop) {
+        body.focus();
+        body.scrollTop = 0;
+        return;
+    }
     const row = [...start, rows].map((selector) => body.querySelector(selector)).find(Boolean);
     (row || body).focus();
 }
@@ -1300,7 +1310,7 @@ async function cyclePane(paneId) {
     }
 }
 
-for (const { body, rows } of Object.values(keyboardPanes)) {
+for (const { body, rows, startAtTop } of Object.values(keyboardPanes)) {
     body.addEventListener('keydown', (event) => {
         if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) {
             return;
@@ -1312,8 +1322,14 @@ for (const { body, rows } of Object.values(keyboardPanes)) {
             event.preventDefault();
             const list = [...body.querySelectorAll(rows)];
             const index = list.indexOf(event.target.closest(rows));
-            const next = index === -1 ? 0 : index + (event.key === 'ArrowDown' ? 1 : -1);
-            list[next]?.focus();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            const next = index === -1 ? Math.min(step, 0) : index + step;
+            if (next < 0 && startAtTop) {
+                body.focus();
+                body.scrollTop = 0;
+            } else {
+                list[next]?.focus();
+            }
         } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
             event.preventDefault();
             const folder = event.target.closest('.branch-folder');
@@ -1537,11 +1553,12 @@ elements.shortcuts.addEventListener('click', (event) => {
     }
 });
 
-// Opens the Commit details pane for the selected commit, or closes it.
+// Opens the Commit details pane for the selected commit and moves the keyboard to it, or closes it.
 function setDetailsOpen(open) {
     if (open) {
         if (state.selectedHash && state.rowByHash.has(state.selectedHash)) {
             showCommitDetails(state.selectedHash, false);
+            focusPane('details-pane');
         }
     } else if (isPaneOpen(elements.detailsPane)) {
         togglePane('details-pane');
@@ -1563,6 +1580,7 @@ const pageKeys = {
     '/': focusCommitFilter,
     b: () => cyclePane('branches-pane'),
     s: () => cyclePane('working-tree-pane'),
+    d: () => cyclePane('details-pane'),
     ',': () => setOptionsOpen(elements.options.hidden),
     '?': toggleShortcuts,
 };

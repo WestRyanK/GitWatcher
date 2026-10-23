@@ -236,7 +236,7 @@
                         </button>
                     </h2>
                 </header>
-                <div id="details" class="details">
+                <div id="details" class="details" tabindex="-1">
                     <p class="muted">Select a commit to see its details.</p>
                 </div>
             </section>
@@ -256,7 +256,7 @@
             <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Select the commit above or below</dd>
             <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Go to the selected commit's child or parent</dd>
             <dt><kbd>H</kbd></dt><dd>Go to the HEAD commit</dd>
-            <dt><kbd>Enter</kbd></dt><dd>Open the selected commit's details</dd>
+            <dt><kbd>Enter</kbd></dt><dd>Open the selected commit's details and go to them</dd>
             <dt><kbd>Esc</kbd></dt><dd>Close the commit details</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>C</kbd></dt><dd>Copy the selected commit's short hash</dd>
             <dt><kbd>/</kbd></dt><dd>Filter the commits</dd>
@@ -265,13 +265,15 @@
         <dl>
             <dt><kbd>B</kbd></dt><dd>Go to Branches, opening it if needed; from Branches, close it</dd>
             <dt><kbd>S</kbd></dt><dd>Go to Status, opening it if needed; from Status, close it</dd>
+            <dt><kbd>D</kbd></dt><dd>Go to Commit details, opening it if needed; from there, close it</dd>
             <dt><kbd>,</kbd></dt><dd>Open or close Options</dd>
             <dt id="shortcut-fullscreen" hidden><kbd>F11</kbd></dt><dd hidden>Full screen, or back over the pane</dd>
             <dt><kbd>?</kbd></dt><dd>Show these shortcuts</dd>
         </dl>
-        <h3>Branches and Status panes</h3>
+        <h3>Branches, Status, and Commit details</h3>
         <dl>
-            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move between the rows</dd>
+            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move between the rows or changed files</dd>
+            <dt><kbd>PgUp</kbd> <kbd>PgDn</kbd></dt><dd>Scroll the pane</dd>
             <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Close or open a branch folder</dd>
             <dt><kbd>Enter</kbd></dt><dd>Go to the branch's commit, close or open a folder, or open a file's diff</dd>
             <dt><kbd>Esc</kbd></dt><dd>Back to the commits</dd>

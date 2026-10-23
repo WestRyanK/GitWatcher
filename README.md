@@ -146,15 +146,16 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
 * **Resizing:** drag any divider to resize the panes (arrow keys work too when a divider has focus, and
   double-click resets it).
 * **Keyboard:** press ? for the list of shortcuts. Up and Down select the commit above or below, and Left and Right
-  go to its child or parent, following the branch it's on. Enter opens the selected commit's details, and Escape
-  closes them. H (or the HEAD label in the toolbar) selects the HEAD commit and scrolls to it, and Ctrl+C copies the
+  go to its child or parent, following the branch it's on. Enter opens the selected commit's details and moves the keyboard to
+  them, and Escape there goes back to the commits; Escape in the commits closes the details. H (or the HEAD label in the toolbar) selects the HEAD commit and scrolls to it, and Ctrl+C copies the
   selected commit's short hash (unless text is selected). / opens the commit filter, and , opens or closes the
   **Options** menu. The arrow keys act on the commits unless the keyboard is in the Branches or Status
   pane; the title of the pane they act on is highlighted. B moves the keyboard to the Branches pane, opening it if
   it's closed and starting on the selected or current branch, and B again from there closes it. S does the same for
-  Status, and Escape in either pane goes back to the commits. In those panes, Up and Down move between the rows, and
-  Enter goes to a branch's commit, opens or closes a folder, or opens a file's diff; Left and Right close and open
-  branch folders. Keys typed into a filter box are left alone.
+  Status and D for Commit details, and Escape in any of them goes back to the commits. In those panes, Up and Down
+  move between the rows (the details start at the top, and Down goes to the changed files), Page Up and Page Down
+  scroll, and Enter goes to a branch's commit, opens or closes a folder, or opens a file's diff; Left and Right close
+  and open branch folders. Keys typed into a filter box are left alone.
 * **Settings:** the page remembers its state (the options, filters, selected commit, open tree nodes, pane sizes,
   and columns) in a per-user file, `~/.git-watcher/settings.json` (set `GIT_WATCHER_SETTINGS` to use another path).
   They survive restarts, port changes, and cleared browser data, and every repository and worktree shares them.

@@ -553,15 +553,17 @@ body.resizing.resizing-rows {
     color: var(--muted);
 }
 
-/* The pane the arrow keys act on has its title in the accent color: the Branches or Status pane when the keyboard is
-   in its list, and otherwise the Commits pane. The lists and the graph take the focus without an outline. */
+/* The pane the arrow keys act on has its title in the accent color: the Branches, Status, or Commit details pane when
+   the keyboard is in it, and otherwise the Commits pane. The panes and the graph take the focus without an outline. */
 #branches-pane:has(.pane-body:focus-within) .pane-header h2,
 #working-tree-pane:has(.pane-body:focus-within) .pane-header h2,
-.workspace:not(:has(.sidebar .pane-body:focus-within)) #graph-heading {
+#details-pane:has(.details:focus-within) .pane-header h2,
+.workspace:not(:has(.sidebar .pane-body:focus-within, .details:focus-within)) #graph-heading {
     color: var(--remote-fg);
 }
 
 .pane-body:focus,
+.details:focus,
 .graph-scroll:focus {
     outline: none;
 }
