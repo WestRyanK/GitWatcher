@@ -23,7 +23,8 @@ const laneColors = [
 
 const elements = {
     repoName: document.getElementById('repo-name'),
-    headInfo: document.getElementById('head-info'),
+    headLink: document.getElementById('head-link'),
+    headCount: document.getElementById('head-count'),
     filter: document.getElementById('filter'),
     scope: document.getElementById('scope'),
     limit: document.getElementById('limit'),
@@ -414,7 +415,8 @@ function render(data) {
     const shown = data.total !== null && data.commits.length < data.total
         ? `${data.commits.length.toLocaleString()} of ${data.total.toLocaleString()} commits`
         : `${data.commits.length.toLocaleString()} commits`;
-    elements.headInfo.textContent = `HEAD: ${headLabel} · ${shown}`;
+    elements.headLink.textContent = `HEAD: ${headLabel}`;
+    elements.headCount.textContent = ` · ${shown}`;
 
     applyFilter();
     if (state.selectedHash && state.rowByHash.has(state.selectedHash)) {
@@ -1334,6 +1336,36 @@ function showCommitDetails(hash, scrollIntoView) {
     }
     selectCommit(hash, scrollIntoView);
 }
+
+// Selects the HEAD commit and scrolls the graph to it, from the HEAD label in the toolbar or the H key.
+function goToHead() {
+    const hash = state.data?.head.hash;
+    if (!hash) {
+        return;
+    }
+    if (!state.rowByHash.has(hash)) {
+        setStatus('HEAD isn\'t in the shown commits.');
+        return;
+    }
+    if (isDiffOpen()) {
+        closeDiff();
+    }
+    showCommitDetails(hash, true);
+}
+
+elements.headLink.addEventListener('click', goToHead);
+
+// H goes to HEAD, unless the key is typed into a text box or comes with a modifier.
+document.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.key.toLowerCase() !== 'h') {
+        return;
+    }
+    if (event.target.isContentEditable || event.target.closest?.('input, select, textarea')) {
+        return;
+    }
+    event.preventDefault();
+    goToHead();
+});
 
 elements.graph.addEventListener('dblclick', (event) => {
     const row = event.target.closest('.row');

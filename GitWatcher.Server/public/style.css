@@ -115,6 +115,22 @@ body {
     min-width: 0;
 }
 
+/* The HEAD part of the toolbar's HEAD line, which goes to the HEAD commit like a link. */
+.head-link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.head-link:hover,
+.head-link:focus-visible {
+    color: var(--fg);
+    text-decoration: underline;
+}
+
 /* Shown under the toolbar while the repository's folder is missing; the panes below it are left over and dimmed. */
 .repo-banner {
     display: flex;
