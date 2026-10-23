@@ -878,7 +878,7 @@ diffElements.syntax.addEventListener('change', () => {
 // Escape closes the view; Alt+Up and Alt+Down step through the files. This listens before the page's other keys, so
 // Escape closes an open menu first, not the view behind it.
 window.addEventListener('keydown', (event) => {
-    if (!isDiffOpen() || !elements.options.hidden || !contextMenu.element.hidden) {
+    if (!isDiffOpen() || !elements.options.hidden || !contextMenu.element.hidden || elements.shortcuts.open) {
         return;
     }
     if (!diffElements.options.hidden) {

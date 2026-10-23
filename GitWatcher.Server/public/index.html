@@ -243,6 +243,44 @@
         </div>
     </main>
     <div id="context-menu" class="context-menu" role="menu" aria-label="Actions" hidden></div>
+    <!-- The keyboard shortcuts, opened with ?. Escape, ?, the close button, or clicking outside closes it. -->
+    <dialog id="shortcuts" class="shortcuts" aria-labelledby="shortcuts-heading">
+        <header class="shortcuts-header">
+            <h2 id="shortcuts-heading">Keyboard shortcuts</h2>
+            <button id="shortcuts-close" class="host-button" type="button" title="Close" aria-label="Close">
+                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+            </button>
+        </header>
+        <h3>Commits</h3>
+        <dl>
+            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Select the commit above or below</dd>
+            <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Go to the selected commit's parent or child</dd>
+            <dt><kbd>H</kbd></dt><dd>Go to the HEAD commit</dd>
+            <dt><kbd>Enter</kbd></dt><dd>Open the selected commit's details</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Close the commit details</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>C</kbd></dt><dd>Copy the selected commit's short hash</dd>
+            <dt><kbd>/</kbd></dt><dd>Filter the commits</dd>
+        </dl>
+        <h3>Panes and menus</h3>
+        <dl>
+            <dt><kbd>B</kbd></dt><dd>Show or hide Branches</dd>
+            <dt><kbd>S</kbd></dt><dd>Show or hide Status</dd>
+            <dt><kbd>,</kbd></dt><dd>Open or close Options</dd>
+            <dt id="shortcut-fullscreen" hidden><kbd>F11</kbd></dt><dd hidden>Full screen, or back over the pane</dd>
+            <dt><kbd>?</kbd></dt><dd>Show these shortcuts</dd>
+        </dl>
+        <h3>Branches pane</h3>
+        <dl>
+            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move between branches and folders</dd>
+            <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Close or open a folder</dd>
+            <dt><kbd>Enter</kbd></dt><dd>Go to the branch's commit, or close or open a folder</dd>
+        </dl>
+        <h3>Diff</h3>
+        <dl>
+            <dt><kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>Alt</kbd>+<kbd>↓</kbd></dt><dd>Step through the files</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Close the diff</dd>
+        </dl>
+    </dialog>
     <script src="vendor/highlight.js/highlight.min.js"></script>
     <script src="vendor/highlight.js/languages/powershell.min.js"></script>
     <script src="vendor/highlight.js/languages/dos.min.js"></script>

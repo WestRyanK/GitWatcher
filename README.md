@@ -145,9 +145,13 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
   panel, web links open in your default browser.
 * **Resizing:** drag any divider to resize the panes (arrow keys work too when a divider has focus, and
   double-click resets it).
-* **Keyboard:** Up and Down select the commit above or below, Enter opens the selected commit's details, and Escape
-  closes them. H (or the HEAD label in the toolbar) selects the HEAD commit and scrolls to it. B and S open or close
-  the Branches and Status panes. Keys typed into a filter box are left alone.
+* **Keyboard:** press ? for the list of shortcuts. Up and Down select the commit above or below, and Left and Right
+  go to its parent or child, following the branch it's on. Enter opens the selected commit's details, and Escape
+  closes them. H (or the HEAD label in the toolbar) selects the HEAD commit and scrolls to it, and Ctrl+C copies the
+  selected commit's short hash (unless text is selected). / opens the commit filter, and , opens or closes the
+  **Options** menu. B and S open or close the Branches and Status panes. In the Branches pane, Up and Down move
+  between branches and folders, Left and Right close and open folders, and Enter goes to a branch's commit. Keys
+  typed into a filter box are left alone.
 * **Settings:** the page remembers its state (the options, filters, selected commit, open tree nodes, pane sizes,
   and columns) in a per-user file, `~/.git-watcher/settings.json` (set `GIT_WATCHER_SETTINGS` to use another path).
   They survive restarts, port changes, and cleared browser data, and every repository and worktree shares them.

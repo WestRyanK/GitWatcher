@@ -25,6 +25,8 @@ const elements = {
     repoName: document.getElementById('repo-name'),
     headLink: document.getElementById('head-link'),
     headCount: document.getElementById('head-count'),
+    shortcuts: document.getElementById('shortcuts'),
+    shortcutsClose: document.getElementById('shortcuts-close'),
     filter: document.getElementById('filter'),
     scope: document.getElementById('scope'),
     limit: document.getElementById('limit'),
@@ -1208,11 +1210,20 @@ async function loadBranches() {
     }
 }
 
+// Redrawing the tree replaces its rows, so the folder that was opened or closed gets the focus back.
+function renderBranchesKeepingFolderFocus(folder) {
+    const hadFocus = folder === document.activeElement;
+    renderBranches();
+    if (hadFocus) {
+        elements.branches.querySelector(`.branch-folder[data-path="${CSS.escape(folder.dataset.path)}"]`)?.focus();
+    }
+}
+
 elements.branches.addEventListener('click', (event) => {
     const folder = event.target.closest('.branch-folder');
     if (folder && Object.hasOwn(closedByDefaultNodes, folder.dataset.path)) {
         writeSetting(closedByDefaultNodes[folder.dataset.path], folder.getAttribute('aria-expanded') === 'true' ? null : 'true');
-        renderBranches();
+        renderBranchesKeepingFolderFocus(folder);
         return;
     }
     if (folder) {
@@ -1223,7 +1234,7 @@ elements.branches.addEventListener('click', (event) => {
             folders.add(folder.dataset.path);
         }
         saveCollapsedBranchFolders();
-        renderBranches();
+        renderBranchesKeepingFolderFocus(folder);
         return;
     }
 
@@ -1237,6 +1248,26 @@ elements.branches.addEventListener('click', (event) => {
     }
     item.classList.add('selected');
     selectCommit(item.dataset.hash, true);
+});
+
+// With a branch or folder focused, Up and Down move between the rows and Left and Right close and open folders. Enter
+// is a button's own key: it goes to a branch's commit or opens or closes a folder. The arrows stay in the pane, so
+// they don't also move through the graph.
+elements.branches.addEventListener('keydown', (event) => {
+    const row = event.target.closest('.branch-item, .branch-folder');
+    if (!row || event.ctrlKey || event.altKey || event.metaKey || !event.key.startsWith('Arrow')) {
+        return;
+    }
+    event.preventDefault();
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        const rows = [...elements.branches.querySelectorAll('.branch-item, .branch-folder')];
+        rows[rows.indexOf(row) + (event.key === 'ArrowDown' ? 1 : -1)]?.focus();
+    } else if (row.classList.contains('branch-folder')) {
+        const expanded = row.getAttribute('aria-expanded') === 'true';
+        if (expanded === (event.key === 'ArrowLeft')) {
+            row.click();
+        }
+    }
 });
 
 function statusClass(code) {
@@ -1367,12 +1398,83 @@ function selectAdjacentCommit(step) {
     }
     const index = hashes.indexOf(state.selectedHash);
     const next = index === -1 ? 0 : Math.min(Math.max(index + step, 0), hashes.length - 1);
-    if (next === index) {
+    if (next !== index) {
+        revealCommit(hashes[next]);
+    }
+}
+
+// Selects a commit from the keyboard, scrolling just enough to show it.
+function revealCommit(hash) {
+    selectCommit(hash, false);
+    state.rowByHash.get(hash).scrollIntoView({ block: 'nearest' });
+}
+
+// Goes from the selected commit to its first parent, or to its child: the one that continues from it as a first
+// parent if there is one, and the closest above it if there are several. Holding either key follows a branch's history.
+function selectParentOrChild(toParent) {
+    const hash = state.selectedHash;
+    const commits = state.data?.commits;
+    if (!commits || !state.rowByHash.has(hash)) {
         return;
     }
-    selectCommit(hashes[next], false);
-    state.rowByHash.get(hashes[next]).scrollIntoView({ block: 'nearest' });
+    let next;
+    if (toParent) {
+        next = commits.find((commit) => commit.hash === hash).parents[0];
+        if (!next) {
+            setStatus('This commit has no parent.');
+            return;
+        }
+    } else {
+        const children = commits.filter((commit) => commit.parents.includes(hash));
+        const continuing = children.filter((commit) => commit.parents[0] === hash);
+        next = (continuing.length > 0 ? continuing : children).at(-1)?.hash;
+        if (!next) {
+            setStatus('This commit has no child in the shown commits.');
+            return;
+        }
+    }
+    if (!state.rowByHash.has(next)) {
+        setStatus('The parent isn\'t in the shown commits.');
+        return;
+    }
+    revealCommit(next);
 }
+
+// Copies the selected commit's short hash, as the right-click menu's Copy short hash does.
+function copySelectedHash() {
+    const hash = state.selectedHash;
+    if (hash && state.rowByHash.has(hash)) {
+        copyWithStatus(() => hash.slice(0, 8), 'the short hash');
+    }
+}
+
+// Opens the Options menu with the commit filter's text selected, ready to type over.
+function focusCommitFilter() {
+    setOptionsOpen(true);
+    elements.filter.select();
+}
+
+function toggleShortcuts() {
+    if (elements.shortcuts.open) {
+        elements.shortcuts.close();
+    } else {
+        closeContextMenu();
+        setOptionsOpen(false);
+        elements.shortcuts.showModal();
+    }
+}
+
+elements.shortcutsClose.addEventListener('click', () => elements.shortcuts.close());
+
+// Clicking the backdrop, outside the dialog's box, closes it.
+elements.shortcuts.addEventListener('click', (event) => {
+    const box = elements.shortcuts.getBoundingClientRect();
+    const inside = event.clientX >= box.left && event.clientX <= box.right
+        && event.clientY >= box.top && event.clientY <= box.bottom;
+    if (event.target === elements.shortcuts && !inside) {
+        elements.shortcuts.close();
+    }
+});
 
 // Opens the Commit details pane for the selected commit, or closes it.
 function setDetailsOpen(open) {
@@ -1385,29 +1487,42 @@ function setDetailsOpen(open) {
     }
 }
 
-// The page's keys. Up and Down select the commit above or below, Enter opens the selected commit's details, and
-// Escape closes them; H goes to HEAD; B and S open or close the Branches and Status panes. Keys typed into a text box,
-// or with Ctrl, Alt, or Win, are left alone, as are Enter on a button and the graph's keys while a diff is open.
+// The page's keys, listed for the user in the shortcuts dialog (index.html), which ? opens. Keys typed into a text
+// box, or with Alt or Win, are left alone, as are Enter on a button and the graph's keys while a diff or menu is open.
+// Ctrl+C copies text instead while there's a text selection.
 const pageKeys = {
     arrowup: () => selectAdjacentCommit(-1),
     arrowdown: () => selectAdjacentCommit(1),
+    arrowleft: () => selectParentOrChild(true),
+    arrowright: () => selectParentOrChild(false),
     enter: () => setDetailsOpen(true),
     escape: () => setDetailsOpen(false),
     h: goToHead,
+    'ctrl+c': copySelectedHash,
+    '/': focusCommitFilter,
     b: () => togglePane('branches-pane'),
     s: () => togglePane('working-tree-pane'),
+    ',': () => setOptionsOpen(elements.options.hidden),
+    '?': toggleShortcuts,
 };
-const graphKeys = new Set(['arrowup', 'arrowdown', 'enter', 'escape']);
+const graphKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'enter', 'escape', 'ctrl+c']);
 
 document.addEventListener('keydown', (event) => {
-    const key = event.key.toLowerCase();
-    if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || !Object.hasOwn(pageKeys, key)) {
+    const key = (event.ctrlKey ? 'ctrl+' : '') + event.key.toLowerCase();
+    if (event.defaultPrevented || event.altKey || event.metaKey || !Object.hasOwn(pageKeys, key)) {
         return;
     }
     if (event.target.isContentEditable || event.target.closest?.('input, select, textarea')) {
         return;
     }
     if (key === 'enter' && event.target.closest?.('button, a, [role="separator"]')) {
+        return;
+    }
+    if (key === 'ctrl+c' && getSelection().toString() !== '') {
+        return;
+    }
+    // The shortcuts dialog is modal: only ? works under it, and Escape closes it.
+    if (elements.shortcuts.open && key !== '?') {
         return;
     }
     // An open diff or menu has these keys to itself, and closing one with Escape leaves the details open.
@@ -1663,6 +1778,9 @@ if (webViewHost) {
 
     // F11 makes the overlay fill the screen, and again puts it back. It's Windows Terminal's full screen key too, so
     // taking it here keeps it from being forwarded below.
+    const fullScreenShortcut = document.getElementById('shortcut-fullscreen');
+    fullScreenShortcut.hidden = false;
+    fullScreenShortcut.nextElementSibling.hidden = false;
     document.addEventListener('keydown', (event) => {
         const modified = event.ctrlKey || event.altKey || event.shiftKey || event.metaKey;
         if (event.key === 'F11' && !event.defaultPrevented && !modified) {
