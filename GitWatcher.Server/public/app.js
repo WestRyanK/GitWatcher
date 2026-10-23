@@ -1493,8 +1493,8 @@ function setDetailsOpen(open) {
 const pageKeys = {
     arrowup: () => selectAdjacentCommit(-1),
     arrowdown: () => selectAdjacentCommit(1),
-    arrowleft: () => selectParentOrChild(true),
-    arrowright: () => selectParentOrChild(false),
+    arrowleft: () => selectParentOrChild(false),
+    arrowright: () => selectParentOrChild(true),
     enter: () => setDetailsOpen(true),
     escape: () => setDetailsOpen(false),
     h: goToHead,

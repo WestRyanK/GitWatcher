@@ -146,7 +146,7 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
 * **Resizing:** drag any divider to resize the panes (arrow keys work too when a divider has focus, and
   double-click resets it).
 * **Keyboard:** press ? for the list of shortcuts. Up and Down select the commit above or below, and Left and Right
-  go to its parent or child, following the branch it's on. Enter opens the selected commit's details, and Escape
+  go to its child or parent, following the branch it's on. Enter opens the selected commit's details, and Escape
   closes them. H (or the HEAD label in the toolbar) selects the HEAD commit and scrolls to it, and Ctrl+C copies the
   selected commit's short hash (unless text is selected). / opens the commit filter, and , opens or closes the
   **Options** menu. B and S open or close the Branches and Status panes. In the Branches pane, Up and Down move
