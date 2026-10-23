@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
@@ -54,6 +55,9 @@ public partial class MainWindow : Window
 
     // Hidden while the placeholder pane's tab isn't the active tab.
     private bool _hiddenWithTab;
+
+    // Covering the terminal's whole monitor instead of docking, after the page's F11. Minimizing ends it.
+    private bool _fullScreen;
 
     private Uri? _viewerAddress;
 
@@ -200,7 +204,7 @@ public partial class MainWindow : Window
                 // Terminal window. Close it and cover this window instead.
                 ClosePlaceholder();
                 _placeholderUnavailable = true;
-                ResizeGrip.Visibility = Visibility.Visible;
+                UpdateResizeGrip();
                 SendForwardedKeys();
                 ShowOverlay();
             }
@@ -215,8 +219,8 @@ public partial class MainWindow : Window
     }
 
     // The page's toolbar has the overlay's minimize and close buttons, so the overlay needs no header row of its own.
-    // It sends "minimize" or "close" with window.chrome.webview.postMessage, and { terminalKey } for a key to forward
-    // to Windows Terminal. Messages from any other page are ignored.
+    // It sends "minimize", "close", or "fullscreen" (for F11) with window.chrome.webview.postMessage, and
+    // { terminalKey } for a key to forward to Windows Terminal. Messages from any other page are ignored.
     private void OnViewerWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (_viewerAddress is null
@@ -238,6 +242,10 @@ public partial class MainWindow : Window
             else if (command == "close")
             {
                 Close();
+            }
+            else if (command == "fullscreen")
+            {
+                ToggleFullScreen();
             }
         }
         else if (root.ValueKind == JsonValueKind.Object
@@ -420,6 +428,8 @@ public partial class MainWindow : Window
 
     private void Collapse()
     {
+        _fullScreen = false;
+        UpdateResizeGrip();
         _settings.Collapsed = true;
         _settings.Save();
         SetCollapsed(true);
@@ -437,8 +447,27 @@ public partial class MainWindow : Window
             _placeholderUnavailable = _placeholder is null;
         }
 
-        // Windows Terminal resizes the pane; the grip is only for covering the window.
-        ResizeGrip.Visibility = _placeholderUnavailable ? Visibility.Visible : Visibility.Collapsed;
+        UpdateResizeGrip();
+    }
+
+    // Windows Terminal resizes the pane; the grip is only for covering the window, and not the whole screen.
+    private void UpdateResizeGrip()
+    {
+        ResizeGrip.Visibility = _placeholderUnavailable && !_fullScreen ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // Full screen covers the terminal's monitor and leaves the placeholder pane as it is, so leaving full screen puts
+    // the overlay back over it.
+    private void ToggleFullScreen()
+    {
+        if (_settings.Collapsed)
+        {
+            return;
+        }
+
+        _fullScreen = !_fullScreen;
+        UpdateResizeGrip();
+        Reposition();
     }
 
     private void ClosePlaceholder()
@@ -521,6 +550,10 @@ public partial class MainWindow : Window
                 (int)Math.Round(CollapsedButtonRightMargin * scale),
                 (int)Math.Round(CollapsedButtonTopMargin * scale));
         }
+        else if (_fullScreen && TryGetMonitorBounds(out PixelRect monitorBounds))
+        {
+            position = monitorBounds;
+        }
         else if (_placeholderOffsets is PaneOffsets offsets)
         {
             position = offsets.Apply(terminalBounds);
@@ -550,6 +583,20 @@ public partial class MainWindow : Window
             position.Width,
             position.Height,
             NativeMethods.SetWindowPosNoZOrder | NativeMethods.SetWindowPosNoActivate);
+    }
+
+    private bool TryGetMonitorBounds(out PixelRect bounds)
+    {
+        nint monitor = NativeMethods.MonitorFromWindow(_terminal.Handle, NativeMethods.MonitorDefaultToNearest);
+        NativeMethods.MonitorInfo info = new() { Size = Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+        if (monitor == 0 || !NativeMethods.GetMonitorInfo(monitor, ref info))
+        {
+            bounds = default;
+            return false;
+        }
+
+        bounds = new PixelRect(info.Monitor.Left, info.Monitor.Top, info.Monitor.Right, info.Monitor.Bottom);
+        return true;
     }
 
     private void OnResizeGripMouseLeftButtonDown(object sender, MouseButtonEventArgs e)

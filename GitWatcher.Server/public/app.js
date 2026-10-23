@@ -25,6 +25,8 @@ const elements = {
     repoName: document.getElementById('repo-name'),
     headLink: document.getElementById('head-link'),
     headCount: document.getElementById('head-count'),
+    shortcuts: document.getElementById('shortcuts'),
+    shortcutsClose: document.getElementById('shortcuts-close'),
     filter: document.getElementById('filter'),
     scope: document.getElementById('scope'),
     limit: document.getElementById('limit'),
@@ -532,7 +534,7 @@ function selectCommit(hash, scrollIntoView) {
 }
 
 async function showDetails(hash) {
-    elements.details.replaceChildren(createElement('p', 'muted', 'Loading…'));
+    replaceKeepingFocus(elements.details, createElement('p', 'muted', 'Loading…'));
     try {
         let details = state.detailsCache.get(hash);
         if (!details) {
@@ -543,7 +545,7 @@ async function showDetails(hash) {
             renderDetails(details);
         }
     } catch (error) {
-        elements.details.replaceChildren(createElement('p', 'muted', `Error: ${error.message}`));
+        replaceKeepingFocus(elements.details, createElement('p', 'muted', `Error: ${error.message}`));
     }
 }
 
@@ -654,6 +656,7 @@ function renderDetails(details) {
         const item = createElement('li');
         const button = createElement('button', 'file-item');
         button.type = 'button';
+        button.dataset.focusKey = `file:${file.path}`;
         button.title = 'Show the diff';
         button.appendChild(createElement('span', `status status-${file.status}`, file.status));
         const pathText = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
@@ -664,7 +667,7 @@ function renderDetails(details) {
     });
     container.appendChild(files);
 
-    elements.details.replaceChildren(container);
+    replaceKeepingFocus(elements.details, container);
 }
 
 const settingKeys = {
@@ -936,15 +939,17 @@ function loadLayoutSettings() {
     }
 }
 
+// Opens or closes a pane for the user, from its toggles or its key, and remembers it. Returns once an opened pane has
+// loaded.
+function togglePane(paneId) {
+    const collapsed = isPaneOpen(document.getElementById(paneId));
+    setPaneCollapsed(paneId, collapsed);
+    writeSetting(settingKeys.collapsedPrefix + paneId, String(collapsed));
+    return Promise.all([loadBranches(), loadWorkingTree()]);
+}
+
 for (const toggle of paneToggles) {
-    toggle.addEventListener('click', () => {
-        const paneId = toggle.getAttribute('aria-controls');
-        const collapsed = toggle.getAttribute('aria-expanded') === 'true';
-        setPaneCollapsed(paneId, collapsed);
-        writeSetting(settingKeys.collapsedPrefix + paneId, String(collapsed));
-        loadBranches();
-        loadWorkingTree();
-    });
+    toggle.addEventListener('click', () => togglePane(toggle.getAttribute('aria-controls')));
 }
 
 
@@ -981,6 +986,7 @@ function createBranchItem(branch, displayName = branch.name, depth = 0) {
     indentBranchRow(item, depth);
     item.dataset.hash = branch.hash;
     item.dataset.name = branch.name;
+    item.dataset.focusKey = `branch:${branch.name}`;
     item.dataset.refName = branch.name;
     // Only local branches have a current flag.
     item.dataset.kind = 'current' in branch ? 'local' : 'remote';
@@ -1113,6 +1119,7 @@ function createFolderRow(name, path, depth, expanded, count, hasCurrent) {
     const row = createElement('button', 'branch-folder');
     row.type = 'button';
     row.dataset.path = path;
+    row.dataset.focusKey = `folder:${path}`;
     row.setAttribute('aria-expanded', String(expanded));
     indentBranchRow(row, depth);
     row.innerHTML = '<svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
@@ -1132,6 +1139,7 @@ function createTagItem(tag, displayName = tag.name, depth = 0) {
     indentBranchRow(item, depth);
     item.dataset.hash = tag.hash;
     item.dataset.name = `tag:${tag.name}`;
+    item.dataset.focusKey = item.dataset.name;
     item.dataset.refName = tag.name;
     item.dataset.kind = 'tag';
     item.classList.toggle('selected', item.dataset.name === state.selectedBranch);
@@ -1189,9 +1197,7 @@ function renderBranches() {
         fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches or tags match.' : 'No branches.'));
     }
 
-    const scrollTop = elements.branches.scrollTop;
-    elements.branches.replaceChildren(fragment);
-    elements.branches.scrollTop = scrollTop;
+    replaceKeepingFocus(elements.branches, fragment);
     elements.branchesCount.textContent = `${data.local.length}`;
 }
 async function loadBranches() {
@@ -1235,6 +1241,117 @@ elements.branches.addEventListener('click', (event) => {
     }
     item.classList.add('selected');
     selectCommit(item.dataset.hash, true);
+});
+
+// The keyboard is in the graph unless it's in the Branches, Status, or Commit details pane. B, S, and D (or Enter for
+// the details) move it to their pane, and Escape brings it back. In a pane, Up and Down move between the rows, and
+// Enter, a button's own key, acts on the row: it goes to a branch's commit, opens or closes a folder, or opens a
+// file's diff. In the Branches pane, Left and Right
+// also close and open folders. The arrows stay in the pane, so they don't also move through the graph.
+const keyboardPanes = {
+    'branches-pane': {
+        body: elements.branches,
+        rows: '.branch-item, .branch-folder',
+        // The row to start on: the selected branch, or else the current one.
+        start: ['.branch-item.selected', '.branch-item.current'],
+    },
+    'working-tree-pane': { body: elements.workingTree, rows: '.status-item', start: [] },
+    // The details start at the top, with the message in view: Page Up and Page Down scroll, Down goes to the changed
+    // files, and Up from the first file goes back to the top.
+    'details-pane': { body: elements.details, rows: '.file-item', start: [], startAtTop: true },
+};
+
+// Redrawing a pane replaces its rows. The row that had the focus gets it back, found by its data-focus-key, or the
+// pane itself if the row is gone, so the keyboard stays in the pane.
+function replaceKeepingFocus(container, fragment) {
+    const hadFocus = container.contains(document.activeElement);
+    const focusKey = document.activeElement?.dataset?.focusKey;
+    const scrollTop = container.scrollTop;
+    container.replaceChildren(fragment);
+    container.scrollTop = scrollTop;
+    if (hadFocus) {
+        const row = focusKey && container.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`);
+        (row || container).focus({ preventScroll: true });
+    }
+}
+
+function focusGraph() {
+    elements.graphScroll.focus({ preventScroll: true });
+}
+
+function focusPane(paneId) {
+    const { body, rows, start, startAtTop } = keyboardPanes[paneId];
+    if (startAtTop) {
+        body.focus();
+        body.scrollTop = 0;
+        return;
+    }
+    const row = [...start, rows].map((selector) => body.querySelector(selector)).find(Boolean);
+    (row || body).focus();
+}
+
+// B and S: open a closed pane and move the keyboard to it, move the keyboard to an open one, or, from inside it,
+// close it and go back to the graph.
+async function cyclePane(paneId) {
+    const pane = document.getElementById(paneId);
+    if (!isPaneOpen(pane)) {
+        // Focus the pane at once, so the keyboard is there while it loads, then the starting row once it's drawn.
+        const loaded = togglePane(paneId);
+        keyboardPanes[paneId].body.focus();
+        await loaded;
+        if (document.activeElement === keyboardPanes[paneId].body) {
+            focusPane(paneId);
+        }
+    } else if (pane.contains(document.activeElement)) {
+        togglePane(paneId);
+        focusGraph();
+    } else {
+        focusPane(paneId);
+    }
+}
+
+for (const { body, rows, startAtTop } of Object.values(keyboardPanes)) {
+    body.addEventListener('keydown', (event) => {
+        if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) {
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            focusGraph();
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            const list = [...body.querySelectorAll(rows)];
+            const index = list.indexOf(event.target.closest(rows));
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            const next = index === -1 ? Math.min(step, 0) : index + step;
+            if (next < 0 && startAtTop) {
+                body.focus();
+                body.scrollTop = 0;
+            } else {
+                list[next]?.focus();
+            }
+        } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+            // The browser pages by nearly the whole pane, which loses your place in a short pane. Half keeps some of
+            // what was in view.
+            event.preventDefault();
+            const direction = event.key === 'PageDown' ? 1 : -1;
+            body.scrollBy({ top: direction * body.clientHeight / 2, behavior: 'smooth' });
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const folder = event.target.closest('.branch-folder');
+            if (folder && (folder.getAttribute('aria-expanded') === 'true') === (event.key === 'ArrowLeft')) {
+                folder.click();
+            }
+        }
+    });
+}
+
+// Down from the branch filter goes to the first matching row.
+elements.branchFilter.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        elements.branches.querySelector(keyboardPanes['branches-pane'].rows)?.focus();
+    }
 });
 
 function statusClass(code) {
@@ -1283,6 +1400,7 @@ function renderWorkingTree() {
             diffFiles.push({ ...file, group: group.key });
             const item = createElement('button', 'status-item');
             item.type = 'button';
+            item.dataset.focusKey = `${group.key}:${file.path}`;
             item.title = 'Show the diff';
             item.appendChild(createElement('span', `status ${group.className || statusClass(file.status)}`, file.status));
             const pathText = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
@@ -1295,9 +1413,7 @@ function renderWorkingTree() {
         fragment.appendChild(createElement('p', 'status-summary', 'Nothing to commit, working tree clean.'));
     }
 
-    const scrollTop = elements.workingTree.scrollTop;
-    elements.workingTree.replaceChildren(fragment);
-    elements.workingTree.scrollTop = scrollTop;
+    replaceKeepingFocus(elements.workingTree, fragment);
     elements.workingTreeCount.textContent = total === 1 ? '1 file' : `${total} files`;
 }
 
@@ -1337,7 +1453,8 @@ function showCommitDetails(hash, scrollIntoView) {
     selectCommit(hash, scrollIntoView);
 }
 
-// Selects the HEAD commit and scrolls the graph to it, from the HEAD label in the toolbar or the H key.
+// Selects the HEAD commit and scrolls the graph to it, from the HEAD label in the toolbar or the H key. Like clicking
+// the commit, this leaves the Commit details pane open or closed as it was.
 function goToHead() {
     const hash = state.data?.head.hash;
     if (!hash) {
@@ -1350,21 +1467,155 @@ function goToHead() {
     if (isDiffOpen()) {
         closeDiff();
     }
-    showCommitDetails(hash, true);
+    selectCommit(hash, true);
 }
 
 elements.headLink.addEventListener('click', goToHead);
 
-// H goes to HEAD, unless the key is typed into a text box or comes with a modifier.
+// Selects the commit above (-1) or below (1) the selected one, or the first commit when none is selected, and scrolls
+// just enough to show it.
+function selectAdjacentCommit(step) {
+    const hashes = [...state.rowByHash.keys()];
+    if (hashes.length === 0) {
+        return;
+    }
+    const index = hashes.indexOf(state.selectedHash);
+    const next = index === -1 ? 0 : Math.min(Math.max(index + step, 0), hashes.length - 1);
+    if (next !== index) {
+        revealCommit(hashes[next]);
+    }
+}
+
+// Selects a commit from the keyboard, scrolling just enough to show it.
+function revealCommit(hash) {
+    selectCommit(hash, false);
+    state.rowByHash.get(hash).scrollIntoView({ block: 'nearest' });
+}
+
+// Goes from the selected commit to its first parent, or to its child: the one that continues from it as a first
+// parent if there is one, and the closest above it if there are several. Holding either key follows a branch's history.
+function selectParentOrChild(toParent) {
+    const hash = state.selectedHash;
+    const commits = state.data?.commits;
+    if (!commits || !state.rowByHash.has(hash)) {
+        return;
+    }
+    let next;
+    if (toParent) {
+        next = commits.find((commit) => commit.hash === hash).parents[0];
+        if (!next) {
+            setStatus('This commit has no parent.');
+            return;
+        }
+    } else {
+        const children = commits.filter((commit) => commit.parents.includes(hash));
+        const continuing = children.filter((commit) => commit.parents[0] === hash);
+        next = (continuing.length > 0 ? continuing : children).at(-1)?.hash;
+        if (!next) {
+            setStatus('This commit has no child in the shown commits.');
+            return;
+        }
+    }
+    if (!state.rowByHash.has(next)) {
+        setStatus('The parent isn\'t in the shown commits.');
+        return;
+    }
+    revealCommit(next);
+}
+
+// Copies the selected commit's short hash, as the right-click menu's Copy short hash does.
+function copySelectedHash() {
+    const hash = state.selectedHash;
+    if (hash && state.rowByHash.has(hash)) {
+        copyWithStatus(() => hash.slice(0, 8), 'the short hash');
+    }
+}
+
+// Opens the Options menu with the commit filter's text selected, ready to type over.
+function focusCommitFilter() {
+    setOptionsOpen(true);
+    elements.filter.select();
+}
+
+function toggleShortcuts() {
+    if (elements.shortcuts.open) {
+        elements.shortcuts.close();
+    } else {
+        closeContextMenu();
+        setOptionsOpen(false);
+        elements.shortcuts.showModal();
+    }
+}
+
+elements.shortcutsClose.addEventListener('click', () => elements.shortcuts.close());
+
+// Clicking the backdrop, outside the dialog's box, closes it.
+elements.shortcuts.addEventListener('click', (event) => {
+    const box = elements.shortcuts.getBoundingClientRect();
+    const inside = event.clientX >= box.left && event.clientX <= box.right
+        && event.clientY >= box.top && event.clientY <= box.bottom;
+    if (event.target === elements.shortcuts && !inside) {
+        elements.shortcuts.close();
+    }
+});
+
+// Opens the Commit details pane for the selected commit and moves the keyboard to it, or closes it.
+function setDetailsOpen(open) {
+    if (open) {
+        if (state.selectedHash && state.rowByHash.has(state.selectedHash)) {
+            showCommitDetails(state.selectedHash, false);
+            focusPane('details-pane');
+        }
+    } else if (isPaneOpen(elements.detailsPane)) {
+        togglePane('details-pane');
+    }
+}
+
+// The page's keys, listed for the user in the shortcuts dialog (index.html), which ? opens. Keys typed into a text
+// box, or with Alt or Win, are left alone, as are Enter on a button and the graph's keys while a diff or menu is open.
+// Ctrl+C copies text instead while there's a text selection.
+const pageKeys = {
+    arrowup: () => selectAdjacentCommit(-1),
+    arrowdown: () => selectAdjacentCommit(1),
+    arrowleft: () => selectParentOrChild(false),
+    arrowright: () => selectParentOrChild(true),
+    enter: () => setDetailsOpen(true),
+    escape: () => setDetailsOpen(false),
+    h: goToHead,
+    'ctrl+c': copySelectedHash,
+    '/': focusCommitFilter,
+    b: () => cyclePane('branches-pane'),
+    s: () => cyclePane('working-tree-pane'),
+    d: () => cyclePane('details-pane'),
+    ',': () => setOptionsOpen(elements.options.hidden),
+    '?': toggleShortcuts,
+};
+const graphKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'enter', 'escape', 'ctrl+c']);
+
 document.addEventListener('keydown', (event) => {
-    if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.key.toLowerCase() !== 'h') {
+    const key = (event.ctrlKey ? 'ctrl+' : '') + event.key.toLowerCase();
+    if (event.defaultPrevented || event.altKey || event.metaKey || !Object.hasOwn(pageKeys, key)) {
         return;
     }
     if (event.target.isContentEditable || event.target.closest?.('input, select, textarea')) {
         return;
     }
+    if (key === 'enter' && event.target.closest?.('button, a, [role="separator"]')) {
+        return;
+    }
+    if (key === 'ctrl+c' && getSelection().toString() !== '') {
+        return;
+    }
+    // The shortcuts dialog is modal: only ? works under it, and Escape closes it.
+    if (elements.shortcuts.open && key !== '?') {
+        return;
+    }
+    // An open diff or menu has these keys to itself, and closing one with Escape leaves the details open.
+    if (graphKeys.has(key) && (isDiffOpen() || !elements.options.hidden || !contextMenu.element.hidden)) {
+        return;
+    }
     event.preventDefault();
-    goToHead();
+    pageKeys[key]();
 });
 
 elements.graph.addEventListener('dblclick', (event) => {
@@ -1515,6 +1766,7 @@ contextMenu.element.addEventListener('keydown', (event) => {
     const buttons = [...contextMenu.element.querySelectorAll('button')];
     const index = buttons.indexOf(document.activeElement);
     if (event.key === 'Escape') {
+        event.preventDefault();
         closeContextMenu();
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
@@ -1608,6 +1860,19 @@ if (webViewHost) {
     document.getElementById('host-controls').hidden = false;
     document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
     document.getElementById('host-close').addEventListener('click', () => webViewHost.postMessage('close'));
+
+    // F11 makes the overlay fill the screen, and again puts it back. It's Windows Terminal's full screen key too, so
+    // taking it here keeps it from being forwarded below.
+    const fullScreenShortcut = document.getElementById('shortcut-fullscreen');
+    fullScreenShortcut.hidden = false;
+    fullScreenShortcut.nextElementSibling.hidden = false;
+    document.addEventListener('keydown', (event) => {
+        const modified = event.ctrlKey || event.altKey || event.shiftKey || event.metaKey;
+        if (event.key === 'F11' && !event.defaultPrevented && !modified) {
+            event.preventDefault();
+            webViewHost.postMessage('fullscreen');
+        }
+    });
 
     // Windows Terminal's layout keys, such as Alt+Shift+arrow keys to resize the pane, come to the page while it has
     // the keyboard. The overlay says which keys it forwards to the terminal, named by their modifiers and key code,

@@ -553,6 +553,21 @@ body.resizing.resizing-rows {
     color: var(--muted);
 }
 
+/* The pane the arrow keys act on has its title in the accent color: the Branches, Status, or Commit details pane when
+   the keyboard is in it, and otherwise the Commits pane. The panes and the graph take the focus without an outline. */
+#branches-pane:has(.pane-body:focus-within) .pane-header h2,
+#working-tree-pane:has(.pane-body:focus-within) .pane-header h2,
+#details-pane:has(.details:focus-within) .pane-header h2,
+.workspace:not(:has(.sidebar .pane-body:focus-within, .details:focus-within)) #graph-heading {
+    color: var(--remote-fg);
+}
+
+.pane-body:focus,
+.details:focus,
+.graph-scroll:focus {
+    outline: none;
+}
+
 .pane-toggle {
     display: inline-flex;
     gap: 4px;
@@ -1078,6 +1093,73 @@ body.resizing.resizing-rows {
 .notice {
     padding: 8px 16px;
     color: var(--muted);
+}
+
+/* The keyboard shortcuts dialog, opened with ?. */
+.shortcuts {
+    width: min(420px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 12px 16px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-alt);
+    color: var(--fg);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.shortcuts::backdrop {
+    background: rgb(0 0 0 / 0.3);
+}
+
+.shortcuts-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.shortcuts h2 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.shortcuts h3 {
+    margin: 14px 0 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.shortcuts dl {
+    display: grid;
+    grid-template-columns: minmax(110px, max-content) 1fr;
+    gap: 6px 16px;
+    margin: 0;
+}
+
+.shortcuts dt {
+    white-space: nowrap;
+}
+
+.shortcuts dd {
+    margin: 0;
+}
+
+.shortcuts [hidden] {
+    display: none;
+}
+
+.shortcuts kbd {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--bg);
+    font: 12px/1.5 ui-monospace, Consolas, monospace;
+    text-align: center;
 }
 
 /* The right-click menu, and the row or branch it's for. */
