@@ -936,15 +936,17 @@ function loadLayoutSettings() {
     }
 }
 
+// Opens or closes a pane for the user, from its toggles or its key, and remembers it.
+function togglePane(paneId) {
+    const collapsed = isPaneOpen(document.getElementById(paneId));
+    setPaneCollapsed(paneId, collapsed);
+    writeSetting(settingKeys.collapsedPrefix + paneId, String(collapsed));
+    loadBranches();
+    loadWorkingTree();
+}
+
 for (const toggle of paneToggles) {
-    toggle.addEventListener('click', () => {
-        const paneId = toggle.getAttribute('aria-controls');
-        const collapsed = toggle.getAttribute('aria-expanded') === 'true';
-        setPaneCollapsed(paneId, collapsed);
-        writeSetting(settingKeys.collapsedPrefix + paneId, String(collapsed));
-        loadBranches();
-        loadWorkingTree();
-    });
+    toggle.addEventListener('click', () => togglePane(toggle.getAttribute('aria-controls')));
 }
 
 
@@ -1356,16 +1358,64 @@ function goToHead() {
 
 elements.headLink.addEventListener('click', goToHead);
 
-// H goes to HEAD, unless the key is typed into a text box or comes with a modifier.
+// Selects the commit above (-1) or below (1) the selected one, or the first commit when none is selected, and scrolls
+// just enough to show it.
+function selectAdjacentCommit(step) {
+    const hashes = [...state.rowByHash.keys()];
+    if (hashes.length === 0) {
+        return;
+    }
+    const index = hashes.indexOf(state.selectedHash);
+    const next = index === -1 ? 0 : Math.min(Math.max(index + step, 0), hashes.length - 1);
+    if (next === index) {
+        return;
+    }
+    selectCommit(hashes[next], false);
+    state.rowByHash.get(hashes[next]).scrollIntoView({ block: 'nearest' });
+}
+
+// Opens the Commit details pane for the selected commit, or closes it.
+function setDetailsOpen(open) {
+    if (open) {
+        if (state.selectedHash && state.rowByHash.has(state.selectedHash)) {
+            showCommitDetails(state.selectedHash, false);
+        }
+    } else if (isPaneOpen(elements.detailsPane)) {
+        togglePane('details-pane');
+    }
+}
+
+// The page's keys. Up and Down select the commit above or below, Enter opens the selected commit's details, and
+// Escape closes them; H goes to HEAD; B and S open or close the Branches and Status panes. Keys typed into a text box,
+// or with Ctrl, Alt, or Win, are left alone, as are Enter on a button and the graph's keys while a diff is open.
+const pageKeys = {
+    arrowup: () => selectAdjacentCommit(-1),
+    arrowdown: () => selectAdjacentCommit(1),
+    enter: () => setDetailsOpen(true),
+    escape: () => setDetailsOpen(false),
+    h: goToHead,
+    b: () => togglePane('branches-pane'),
+    s: () => togglePane('working-tree-pane'),
+};
+const graphKeys = new Set(['arrowup', 'arrowdown', 'enter', 'escape']);
+
 document.addEventListener('keydown', (event) => {
-    if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.key.toLowerCase() !== 'h') {
+    const key = event.key.toLowerCase();
+    if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || !Object.hasOwn(pageKeys, key)) {
         return;
     }
     if (event.target.isContentEditable || event.target.closest?.('input, select, textarea')) {
         return;
     }
+    if (key === 'enter' && event.target.closest?.('button, a, [role="separator"]')) {
+        return;
+    }
+    // An open diff or menu has these keys to itself, and closing one with Escape leaves the details open.
+    if (graphKeys.has(key) && (isDiffOpen() || !elements.options.hidden || !contextMenu.element.hidden)) {
+        return;
+    }
     event.preventDefault();
-    goToHead();
+    pageKeys[key]();
 });
 
 elements.graph.addEventListener('dblclick', (event) => {
@@ -1516,6 +1566,7 @@ contextMenu.element.addEventListener('keydown', (event) => {
     const buttons = [...contextMenu.element.querySelectorAll('button')];
     const index = buttons.indexOf(document.activeElement);
     if (event.key === 'Escape') {
+        event.preventDefault();
         closeContextMenu();
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
@@ -1609,6 +1660,16 @@ if (webViewHost) {
     document.getElementById('host-controls').hidden = false;
     document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
     document.getElementById('host-close').addEventListener('click', () => webViewHost.postMessage('close'));
+
+    // F11 makes the overlay fill the screen, and again puts it back. It's Windows Terminal's full screen key too, so
+    // taking it here keeps it from being forwarded below.
+    document.addEventListener('keydown', (event) => {
+        const modified = event.ctrlKey || event.altKey || event.shiftKey || event.metaKey;
+        if (event.key === 'F11' && !event.defaultPrevented && !modified) {
+            event.preventDefault();
+            webViewHost.postMessage('fullscreen');
+        }
+    });
 
     // Windows Terminal's layout keys, such as Alt+Shift+arrow keys to resize the pane, come to the page while it has
     // the keyboard. The overlay says which keys it forwards to the terminal, named by their modifiers and key code,

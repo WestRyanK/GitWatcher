@@ -21,6 +21,8 @@ internal static class NativeMethods
     public const int ObjectIdWindow = 0;
     public const int ChildIdSelf = 0;
 
+    public const uint MonitorDefaultToNearest = 2;
+
     public const uint SetWindowPosNoZOrder = 0x0004;
     public const uint SetWindowPosNoActivate = 0x0010;
 
@@ -44,6 +46,15 @@ internal static class NativeMethods
         public int Top;
         public int Right;
         public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect WorkArea;
+        public uint Flags;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -163,6 +174,13 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    public static extern nint MonitorFromWindow(nint window, uint flags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

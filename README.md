@@ -64,6 +64,8 @@ row hidden too (quake mode, focus mode, or full screen).
 * **Minimize:** the panel's minimize button closes the pane, so your shell gets its full width back, and leaves a
   small button in the terminal's top-right corner. Click it to split the pane again and reopen the panel. Closing the
   pane yourself does the same as minimizing. The viewer keeps running while it's minimized, so it reopens instantly.
+* **Full screen:** F11 makes the panel cover the terminal's whole screen, and F11 again puts it back over its pane.
+  The panel takes F11 from Windows Terminal, where it's full screen for the terminal, and minimizing ends it.
 * The width and the minimized state are saved in `~/.git-watcher/overlay.json`.
 
 In a classic console window, which has no panes, the panel covers the right side of the window instead, below any
@@ -143,6 +145,9 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
   panel, web links open in your default browser.
 * **Resizing:** drag any divider to resize the panes (arrow keys work too when a divider has focus, and
   double-click resets it).
+* **Keyboard:** Up and Down select the commit above or below, Enter opens the selected commit's details, and Escape
+  closes them. H (or the HEAD label in the toolbar) selects the HEAD commit and scrolls to it. B and S open or close
+  the Branches and Status panes. Keys typed into a filter box are left alone.
 * **Settings:** the page remembers its state (the options, filters, selected commit, open tree nodes, pane sizes,
   and columns) in a per-user file, `~/.git-watcher/settings.json` (set `GIT_WATCHER_SETTINGS` to use another path).
   They survive restarts, port changes, and cleared browser data, and every repository and worktree shares them.

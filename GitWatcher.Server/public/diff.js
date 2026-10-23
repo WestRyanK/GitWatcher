@@ -883,12 +883,14 @@ window.addEventListener('keydown', (event) => {
     }
     if (!diffElements.options.hidden) {
         if (event.key === 'Escape') {
+            event.preventDefault();
             setDiffOptionsOpen(false);
             diffElements.optionsToggle.focus();
         }
         return;
     }
     if (event.key === 'Escape') {
+        event.preventDefault();
         closeDiff();
     } else if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
         event.preventDefault();
