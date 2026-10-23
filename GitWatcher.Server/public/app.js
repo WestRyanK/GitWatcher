@@ -1337,7 +1337,8 @@ function showCommitDetails(hash, scrollIntoView) {
     selectCommit(hash, scrollIntoView);
 }
 
-// Selects the HEAD commit and scrolls the graph to it, from the HEAD label in the toolbar or the H key.
+// Selects the HEAD commit and scrolls the graph to it, from the HEAD label in the toolbar or the H key. Like clicking
+// the commit, this leaves the Commit details pane open or closed as it was.
 function goToHead() {
     const hash = state.data?.head.hash;
     if (!hash) {
@@ -1350,7 +1351,7 @@ function goToHead() {
     if (isDiffOpen()) {
         closeDiff();
     }
-    showCommitDetails(hash, true);
+    selectCommit(hash, true);
 }
 
 elements.headLink.addEventListener('click', goToHead);
