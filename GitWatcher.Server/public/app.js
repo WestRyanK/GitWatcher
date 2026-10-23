@@ -938,13 +938,13 @@ function loadLayoutSettings() {
     }
 }
 
-// Opens or closes a pane for the user, from its toggles or its key, and remembers it.
+// Opens or closes a pane for the user, from its toggles or its key, and remembers it. Returns once an opened pane has
+// loaded.
 function togglePane(paneId) {
     const collapsed = isPaneOpen(document.getElementById(paneId));
     setPaneCollapsed(paneId, collapsed);
     writeSetting(settingKeys.collapsedPrefix + paneId, String(collapsed));
-    loadBranches();
-    loadWorkingTree();
+    return Promise.all([loadBranches(), loadWorkingTree()]);
 }
 
 for (const toggle of paneToggles) {
@@ -985,6 +985,7 @@ function createBranchItem(branch, displayName = branch.name, depth = 0) {
     indentBranchRow(item, depth);
     item.dataset.hash = branch.hash;
     item.dataset.name = branch.name;
+    item.dataset.focusKey = `branch:${branch.name}`;
     item.dataset.refName = branch.name;
     // Only local branches have a current flag.
     item.dataset.kind = 'current' in branch ? 'local' : 'remote';
@@ -1117,6 +1118,7 @@ function createFolderRow(name, path, depth, expanded, count, hasCurrent) {
     const row = createElement('button', 'branch-folder');
     row.type = 'button';
     row.dataset.path = path;
+    row.dataset.focusKey = `folder:${path}`;
     row.setAttribute('aria-expanded', String(expanded));
     indentBranchRow(row, depth);
     row.innerHTML = '<svg class="chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
@@ -1136,6 +1138,7 @@ function createTagItem(tag, displayName = tag.name, depth = 0) {
     indentBranchRow(item, depth);
     item.dataset.hash = tag.hash;
     item.dataset.name = `tag:${tag.name}`;
+    item.dataset.focusKey = item.dataset.name;
     item.dataset.refName = tag.name;
     item.dataset.kind = 'tag';
     item.classList.toggle('selected', item.dataset.name === state.selectedBranch);
@@ -1193,9 +1196,7 @@ function renderBranches() {
         fragment.appendChild(createElement('p', 'status-summary', query ? 'No branches or tags match.' : 'No branches.'));
     }
 
-    const scrollTop = elements.branches.scrollTop;
-    elements.branches.replaceChildren(fragment);
-    elements.branches.scrollTop = scrollTop;
+    replaceKeepingFocus(elements.branches, fragment);
     elements.branchesCount.textContent = `${data.local.length}`;
 }
 async function loadBranches() {
@@ -1210,20 +1211,11 @@ async function loadBranches() {
     }
 }
 
-// Redrawing the tree replaces its rows, so the folder that was opened or closed gets the focus back.
-function renderBranchesKeepingFolderFocus(folder) {
-    const hadFocus = folder === document.activeElement;
-    renderBranches();
-    if (hadFocus) {
-        elements.branches.querySelector(`.branch-folder[data-path="${CSS.escape(folder.dataset.path)}"]`)?.focus();
-    }
-}
-
 elements.branches.addEventListener('click', (event) => {
     const folder = event.target.closest('.branch-folder');
     if (folder && Object.hasOwn(closedByDefaultNodes, folder.dataset.path)) {
         writeSetting(closedByDefaultNodes[folder.dataset.path], folder.getAttribute('aria-expanded') === 'true' ? null : 'true');
-        renderBranchesKeepingFolderFocus(folder);
+        renderBranches();
         return;
     }
     if (folder) {
@@ -1234,7 +1226,7 @@ elements.branches.addEventListener('click', (event) => {
             folders.add(folder.dataset.path);
         }
         saveCollapsedBranchFolders();
-        renderBranchesKeepingFolderFocus(folder);
+        renderBranches();
         return;
     }
 
@@ -1250,23 +1242,93 @@ elements.branches.addEventListener('click', (event) => {
     selectCommit(item.dataset.hash, true);
 });
 
-// With a branch or folder focused, Up and Down move between the rows and Left and Right close and open folders. Enter
-// is a button's own key: it goes to a branch's commit or opens or closes a folder. The arrows stay in the pane, so
-// they don't also move through the graph.
-elements.branches.addEventListener('keydown', (event) => {
-    const row = event.target.closest('.branch-item, .branch-folder');
-    if (!row || event.ctrlKey || event.altKey || event.metaKey || !event.key.startsWith('Arrow')) {
-        return;
+// The keyboard is in the graph unless it's in the Branches or Status pane. B and S move it to their pane, and Escape
+// brings it back. In a pane, Up and Down move between the rows, and Enter, a button's own key, acts on the row: it
+// goes to a branch's commit, opens or closes a folder, or opens a file's diff. In the Branches pane, Left and Right
+// also close and open folders. The arrows stay in the pane, so they don't also move through the graph.
+const keyboardPanes = {
+    'branches-pane': {
+        body: elements.branches,
+        rows: '.branch-item, .branch-folder',
+        // The row to start on: the selected branch, or else the current one.
+        start: ['.branch-item.selected', '.branch-item.current'],
+    },
+    'working-tree-pane': { body: elements.workingTree, rows: '.status-item', start: [] },
+};
+
+// Redrawing a pane replaces its rows. The row that had the focus gets it back, found by its data-focus-key, or the
+// pane itself if the row is gone, so the keyboard stays in the pane.
+function replaceKeepingFocus(container, fragment) {
+    const hadFocus = container.contains(document.activeElement);
+    const focusKey = document.activeElement?.dataset?.focusKey;
+    const scrollTop = container.scrollTop;
+    container.replaceChildren(fragment);
+    container.scrollTop = scrollTop;
+    if (hadFocus) {
+        const row = focusKey && container.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`);
+        (row || container).focus({ preventScroll: true });
     }
-    event.preventDefault();
-    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        const rows = [...elements.branches.querySelectorAll('.branch-item, .branch-folder')];
-        rows[rows.indexOf(row) + (event.key === 'ArrowDown' ? 1 : -1)]?.focus();
-    } else if (row.classList.contains('branch-folder')) {
-        const expanded = row.getAttribute('aria-expanded') === 'true';
-        if (expanded === (event.key === 'ArrowLeft')) {
-            row.click();
+}
+
+function focusGraph() {
+    elements.graphScroll.focus({ preventScroll: true });
+}
+
+function focusPane(paneId) {
+    const { body, rows, start } = keyboardPanes[paneId];
+    const row = [...start, rows].map((selector) => body.querySelector(selector)).find(Boolean);
+    (row || body).focus();
+}
+
+// B and S: open a closed pane and move the keyboard to it, move the keyboard to an open one, or, from inside it,
+// close it and go back to the graph.
+async function cyclePane(paneId) {
+    const pane = document.getElementById(paneId);
+    if (!isPaneOpen(pane)) {
+        // Focus the pane at once, so the keyboard is there while it loads, then the starting row once it's drawn.
+        const loaded = togglePane(paneId);
+        keyboardPanes[paneId].body.focus();
+        await loaded;
+        if (document.activeElement === keyboardPanes[paneId].body) {
+            focusPane(paneId);
         }
+    } else if (pane.contains(document.activeElement)) {
+        togglePane(paneId);
+        focusGraph();
+    } else {
+        focusPane(paneId);
+    }
+}
+
+for (const { body, rows } of Object.values(keyboardPanes)) {
+    body.addEventListener('keydown', (event) => {
+        if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) {
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            focusGraph();
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            const list = [...body.querySelectorAll(rows)];
+            const index = list.indexOf(event.target.closest(rows));
+            const next = index === -1 ? 0 : index + (event.key === 'ArrowDown' ? 1 : -1);
+            list[next]?.focus();
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const folder = event.target.closest('.branch-folder');
+            if (folder && (folder.getAttribute('aria-expanded') === 'true') === (event.key === 'ArrowLeft')) {
+                folder.click();
+            }
+        }
+    });
+}
+
+// Down from the branch filter goes to the first matching row.
+elements.branchFilter.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        elements.branches.querySelector(keyboardPanes['branches-pane'].rows)?.focus();
     }
 });
 
@@ -1316,6 +1378,7 @@ function renderWorkingTree() {
             diffFiles.push({ ...file, group: group.key });
             const item = createElement('button', 'status-item');
             item.type = 'button';
+            item.dataset.focusKey = `${group.key}:${file.path}`;
             item.title = 'Show the diff';
             item.appendChild(createElement('span', `status ${group.className || statusClass(file.status)}`, file.status));
             const pathText = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
@@ -1328,9 +1391,7 @@ function renderWorkingTree() {
         fragment.appendChild(createElement('p', 'status-summary', 'Nothing to commit, working tree clean.'));
     }
 
-    const scrollTop = elements.workingTree.scrollTop;
-    elements.workingTree.replaceChildren(fragment);
-    elements.workingTree.scrollTop = scrollTop;
+    replaceKeepingFocus(elements.workingTree, fragment);
     elements.workingTreeCount.textContent = total === 1 ? '1 file' : `${total} files`;
 }
 
@@ -1500,8 +1561,8 @@ const pageKeys = {
     h: goToHead,
     'ctrl+c': copySelectedHash,
     '/': focusCommitFilter,
-    b: () => togglePane('branches-pane'),
-    s: () => togglePane('working-tree-pane'),
+    b: () => cyclePane('branches-pane'),
+    s: () => cyclePane('working-tree-pane'),
     ',': () => setOptionsOpen(elements.options.hidden),
     '?': toggleShortcuts,
 };

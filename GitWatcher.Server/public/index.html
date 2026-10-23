@@ -136,7 +136,7 @@
                     </header>
                     <input id="branch-filter" class="pane-filter" type="search" placeholder="Filter branches"
                         aria-label="Filter branches">
-                    <div id="branches" class="pane-body"></div>
+                    <div id="branches" class="pane-body" tabindex="-1"></div>
                 </section>
                 <div id="sidebar-splitter" class="splitter" role="separator" tabindex="0" aria-controls="branches-pane"
                     aria-label="Resize the branches and status panes" title="Drag to resize. Double-click to reset."></div>
@@ -149,7 +149,7 @@
                         </h2>
                         <span id="working-tree-count" class="muted"></span>
                     </header>
-                    <div id="working-tree" class="pane-body"></div>
+                    <div id="working-tree" class="pane-body" tabindex="-1"></div>
                 </section>
             </div>
         </aside>
@@ -174,7 +174,7 @@
                                 class="column-resizer" title="Drag to resize. Double-click to reset."></span></span>
                     </div>
                 </header>
-                <div id="graph-scroll" class="graph-scroll">
+                <div id="graph-scroll" class="graph-scroll" tabindex="-1">
                     <div id="graph" class="graph"></div>
                 </div>
                 <!-- One file's diff, over the Commits pane. diff.js fills it in. -->
@@ -263,17 +263,18 @@
         </dl>
         <h3>Panes and menus</h3>
         <dl>
-            <dt><kbd>B</kbd></dt><dd>Show or hide Branches</dd>
-            <dt><kbd>S</kbd></dt><dd>Show or hide Status</dd>
+            <dt><kbd>B</kbd></dt><dd>Go to Branches, opening it if needed; from Branches, close it</dd>
+            <dt><kbd>S</kbd></dt><dd>Go to Status, opening it if needed; from Status, close it</dd>
             <dt><kbd>,</kbd></dt><dd>Open or close Options</dd>
             <dt id="shortcut-fullscreen" hidden><kbd>F11</kbd></dt><dd hidden>Full screen, or back over the pane</dd>
             <dt><kbd>?</kbd></dt><dd>Show these shortcuts</dd>
         </dl>
-        <h3>Branches pane</h3>
+        <h3>Branches and Status panes</h3>
         <dl>
-            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move between branches and folders</dd>
-            <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Close or open a folder</dd>
-            <dt><kbd>Enter</kbd></dt><dd>Go to the branch's commit, or close or open a folder</dd>
+            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move between the rows</dd>
+            <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Close or open a branch folder</dd>
+            <dt><kbd>Enter</kbd></dt><dd>Go to the branch's commit, close or open a folder, or open a file's diff</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Back to the commits</dd>
         </dl>
         <h3>Diff</h3>
         <dl>
