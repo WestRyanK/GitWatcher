@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using Microsoft.Win32;
@@ -7,12 +9,14 @@ using Microsoft.Win32;
 namespace GitWatcher.Overlay;
 
 /// <summary>
-/// Docks Git Watcher to the right side of the terminal window that started it.
+/// Docks Git Watcher to the right side of the terminal window that started it, or with <c>--window</c>, opens it in a
+/// window of its own.
 /// </summary>
 public partial class App : Application
 {
     private GitWatcherServer? _server;
     private string? _followFile;
+    private EventWaitHandle? _startedAgain;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -36,6 +40,22 @@ public partial class App : Application
 
         _followFile = options.FollowFile;
 
+        if (options.Standalone)
+        {
+            if (ShowExistingWindow(options.RepositoryPath))
+            {
+                Shutdown();
+                return;
+            }
+
+            StandaloneWindow standalone = new(WindowSettings.Load());
+            MainWindow = standalone;
+            standalone.Show();
+            BringToFrontWhenStartedAgain(standalone);
+            await StartServerAsync(options, standalone.ShowViewer, standalone.ShowMessage);
+            return;
+        }
+
         TerminalWindow? terminal = TerminalWindow.Find(options.TerminalWindow);
         if (terminal is null)
         {
@@ -47,24 +67,69 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
         CloseWhenShellExits(options.ShellProcessId, window);
-
-        try
-        {
-            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath, options.FollowFile);
-            window.ShowViewer(_server.Address);
-        }
-        catch (Exception exception)
-        {
-            // Startup failures (no Node.js, no WebView2 runtime, a server error) are shown in the overlay itself.
-            window.ShowMessage(exception.Message);
-        }
+        await StartServerAsync(options, window.ShowViewer, window.ShowMessage);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _server?.Dispose();
+        _startedAgain?.Dispose();
         DeleteFollowFile();
         base.OnExit(e);
+    }
+
+    /// <summary>Whether Windows uses the light app mode, which the app's colors follow.</summary>
+    internal static bool UsesLightTheme { get; private set; }
+
+    private async Task StartServerAsync(OverlayOptions options, Action<Uri> showViewer, Action<string> showMessage)
+    {
+        try
+        {
+            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath, options.FollowFile);
+            showViewer(_server.Address);
+        }
+        catch (Exception exception)
+        {
+            // Startup failures (no Node.js, no WebView2 runtime, a server error) are shown in the window itself.
+            showMessage(exception.Message);
+        }
+    }
+
+    // A window for a folder that already has one shows that window instead of opening another. Each folder has a
+    // named event, which this process creates, or signals if another process already did. Signaling also lets that
+    // process take the foreground, which only the process the user just started may give it. A window that follows a
+    // shell can move to another repository, so it neither reuses another window nor is reused.
+    private bool ShowExistingWindow(string repositoryPath)
+    {
+        if (_followFile is not null)
+        {
+            return false;
+        }
+
+        string folder = Path.TrimEndingDirectorySeparator(repositoryPath).ToUpperInvariant();
+        string key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(folder)));
+        _startedAgain = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\GitWatcher.Window.{key}", out bool createdNew);
+        if (createdNew)
+        {
+            return false;
+        }
+
+        NativeMethods.AllowSetForegroundWindow(NativeMethods.AllowSetForegroundAnyProcess);
+        _startedAgain.Set();
+        return true;
+    }
+
+    private void BringToFrontWhenStartedAgain(StandaloneWindow window)
+    {
+        if (_startedAgain is not null)
+        {
+            ThreadPool.RegisterWaitForSingleObject(
+                _startedAgain,
+                (_, _) => window.Dispatcher.BeginInvoke(window.BringToFront),
+                null,
+                Timeout.Infinite,
+                executeOnlyOnce: false);
+        }
     }
 
     // The shell only writes its folder while the file exists, so deleting it stops a closed overlay's shell from
@@ -113,7 +178,7 @@ public partial class App : Application
     // Matches the viewer page's colors, which follow the Windows light or dark app mode.
     private void ApplyTheme()
     {
-        bool useLightTheme = Registry.GetValue(
+        bool useLightTheme = UsesLightTheme = Registry.GetValue(
             @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
             "AppsUseLightTheme",
             1) is not int value || value != 0;

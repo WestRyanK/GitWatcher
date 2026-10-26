@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -7,7 +6,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
 
 namespace GitWatcher.Overlay;
 
@@ -89,16 +87,9 @@ public partial class MainWindow : Window
         MessageText.Visibility = Visibility.Collapsed;
         Header.Visibility = Visibility.Collapsed;
         Viewer.Visibility = Visibility.Visible;
-        Viewer.CreationProperties = new CoreWebView2CreationProperties
-        {
-            UserDataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "GitWatcher.Overlay",
-                "WebView2"),
-        };
         Viewer.CoreWebView2InitializationCompleted += OnViewerInitializationCompleted;
         Viewer.WebMessageReceived += OnViewerWebMessageReceived;
-        Viewer.Source = address;
+        ViewerHost.Navigate(Viewer, address);
     }
 
     internal void ShowMessage(string message)
@@ -223,9 +214,7 @@ public partial class MainWindow : Window
     // { terminalKey } for a key to forward to Windows Terminal. Messages from any other page are ignored.
     private void OnViewerWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        if (_viewerAddress is null
-            || !Uri.TryCreate(e.Source, UriKind.Absolute, out Uri? source)
-            || Uri.Compare(source, _viewerAddress, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) != 0)
+        if (!ViewerHost.IsFromViewer(e, _viewerAddress))
         {
             return;
         }
@@ -385,21 +374,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        Viewer.CoreWebView2.NewWindowRequested += OnViewerNewWindowRequested;
+        Viewer.CoreWebView2.NewWindowRequested += ViewerHost.OpenInBrowser;
 
         // The page forgets the keys to forward when it reloads, so send them with every load.
         Viewer.CoreWebView2.NavigationCompleted += (_, _) => SendForwardedKeys();
-    }
-
-    // The page opens web pages, such as a commit in Azure DevOps, in a new window. Open them in the default browser
-    // instead of a bare WebView2 window. Only web addresses are opened.
-    private void OnViewerNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
-    {
-        e.Handled = true;
-        if (Uri.TryCreate(e.Uri, UriKind.Absolute, out Uri? uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
-        {
-            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
-        }
     }
 
     // Minimized, the overlay shrinks to a small button in the terminal's top-right corner, and the placeholder pane

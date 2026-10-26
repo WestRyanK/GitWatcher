@@ -1,4 +1,10 @@
 <Application x:Class="GitWatcher.Overlay.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             ShutdownMode="OnMainWindowClose" />
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <!-- A small commit graph, 16 by 16: two commits on one line and a branch merging into it. It's the minimized
+             overlay's button and the standalone window's icon. -->
+        <Geometry x:Key="CommitGraphGlyph">M5,2.25 A1.75,1.75 0 1 1 5,5.75 A1.75,1.75 0 1 1 5,2.25 M5,10.25 A1.75,1.75 0 1 1 5,13.75 A1.75,1.75 0 1 1 5,10.25 M11,5.25 A1.75,1.75 0 1 1 11,8.75 A1.75,1.75 0 1 1 11,5.25 M5,5.75 L5,10.25 M11,8.75 C11,10.5 5,9 5,10.25</Geometry>
+    </Application.Resources>
+</Application>

@@ -77,6 +77,23 @@ To open the panel by typing `gw`, add an alias to your PowerShell profile:
 Set-Alias gw Start-GitWatcher
 ```
 
+### In a window of its own
+
+To show the viewer in an ordinary window instead, with a title bar and a taskbar button, run:
+
+```powershell
+Start-GitWatcher -Window
+```
+
+It works from any shell, not only Windows Terminal, and the window stays open after you close the terminal. Closing
+the window stops the viewer. Running it again for the same folder brings that folder's window to the front instead of
+opening another one. With `-Follow` too, the window follows your shell's folder until the shell exits, then keeps
+showing the last repository, and a new window opens each time.
+
+* **Full screen:** F11 makes the window cover its screen, and F11 again puts it back.
+* The window's size, position, and maximized state are saved in `~/.git-watcher/window.json`, so it opens where you
+  left it.
+
 ### In a browser
 
 ```powershell
@@ -102,8 +119,8 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
   **Commits from** (`current`: HEAD only, `local`: local branches and HEAD, or `all`: also remote branches and tags),
   **Show** (how many commits), and **Live** are in the **Options** menu (the sliders icon at the top right).
 * **Theme:** choose **System**, **Light**, or **Dark** in the **Options** menu. **System** follows Windows' light or
-  dark mode as it changes. The Windows Terminal panel's own frame and its minimized button always follow Windows'
-  mode.
+  dark mode as it changes. The Windows Terminal panel's own frame and its minimized button, and the standalone
+  window's title bar, always follow Windows' mode.
 * **Commit details** are below the graph: the full message, author, date, and changed files. Double-click a commit
   to open them if they're collapsed. Click a pane's title to collapse it to its title row or open it again.
 * **Columns:** the **Author**, **Date**, and **Commit** labels in the Commits title row line up with those columns.
@@ -213,7 +230,7 @@ Git Watcher never changes your repository. Its menus copy commands for you to ru
 ## How it works
 
 * [`GitWatcher.Server`](GitWatcher.Server) holds the Node server (`server.js`) and the page it serves (`public/`).
-* [`GitWatcher.Overlay`](GitWatcher.Overlay) is the WPF app for the Windows Terminal panel.
+* [`GitWatcher.Overlay`](GitWatcher.Overlay) is the WPF app for the Windows Terminal panel and the standalone window.
 * [`GitWatcher.psm1`](GitWatcher.psm1) is the PowerShell module with `Start-GitWatcher`, which builds the panel when
   needed and starts it. [`Install.ps1`](Install.ps1) installs the module and the
   Claude Code skill.
@@ -262,3 +279,7 @@ version and asks you to close every panel. The next run then rebuilds it.
 * It starts its own `server.js` on a free port for the shell's current folder, shows it with WebView2, and stops the
   server when it closes. The server also exits on its own if the panel's process goes away. The page settings are
   shared with the browser view.
+* `--window` (from `Start-GitWatcher -Window`) shows the same page in a `StandaloneWindow` instead, with none of the
+  docking. The page loads with `?host=window`, which hides the panel's own minimize and close buttons. Each folder's
+  window has a named event: a second start for the same folder signals it, lets it take the foreground with
+  `AllowSetForegroundWindow`, and exits.

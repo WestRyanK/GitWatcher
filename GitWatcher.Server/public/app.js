@@ -1854,18 +1854,25 @@ for (const control of rememberedControls) {
 }
 
 // Inside the Windows Terminal overlay, the page is hosted by WebView2, and the overlay's minimize and close buttons
-// live in this toolbar to keep everything on one line. They ask the overlay to act through WebView2's messages.
+// live in this toolbar to keep everything on one line. They ask the overlay to act through WebView2's messages. The
+// overlay's standalone window (?host=window) has a title bar with its own buttons, so it doesn't need them.
 const webViewHost = window.chrome?.webview;
 if (webViewHost) {
-    document.getElementById('host-controls').hidden = false;
-    document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
-    document.getElementById('host-close').addEventListener('click', () => webViewHost.postMessage('close'));
+    const inStandaloneWindow = new URLSearchParams(location.search).get('host') === 'window';
+    if (!inStandaloneWindow) {
+        document.getElementById('host-controls').hidden = false;
+        document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
+        document.getElementById('host-close').addEventListener('click', () => webViewHost.postMessage('close'));
+    }
 
     // F11 makes the overlay fill the screen, and again puts it back. It's Windows Terminal's full screen key too, so
     // taking it here keeps it from being forwarded below.
     const fullScreenShortcut = document.getElementById('shortcut-fullscreen');
     fullScreenShortcut.hidden = false;
     fullScreenShortcut.nextElementSibling.hidden = false;
+    if (inStandaloneWindow) {
+        fullScreenShortcut.nextElementSibling.textContent = 'Full screen, or back to the window';
+    }
     document.addEventListener('keydown', (event) => {
         const modified = event.ctrlKey || event.altKey || event.shiftKey || event.metaKey;
         if (event.key === 'F11' && !event.defaultPrevented && !modified) {
