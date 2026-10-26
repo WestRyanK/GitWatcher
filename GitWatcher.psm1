@@ -24,13 +24,15 @@ function Update-GitWatcherFollowFile {
 function Start-GitWatcher {
     <#
     .SYNOPSIS
-        Docks Git Watcher, the live git graph viewer, to the right side of the current terminal window.
+        Docks Git Watcher, the live git graph viewer, to the right side of the current terminal window, or opens it
+        in a window of its own.
 
     .DESCRIPTION
         Starts GitWatcher.Overlay, a small WPF app that shows Git Watcher for a repository in a panel docked to the
         right side of the terminal window you run this from. In Windows Terminal it splits the current tab and covers
         the new pane, so your shell's text wraps before the panel. The panel follows the window when you move or
         resize it, hides when you minimize it or switch tabs, and closes when you close the window or this shell.
+        With -Window, it opens in a window of its own instead, which stays open until you close it.
 
         The first run builds the app (it needs the .NET 10 SDK), and so does any run after its sources change. The
         viewer also needs Node.js on PATH and the WebView2 runtime, which comes with Windows 11.
@@ -41,6 +43,13 @@ function Start-GitWatcher {
     .PARAMETER Follow
         Keeps showing the repository of this shell's current folder: after a cd into another repository, the panel
         shows that one, and outside any repository it says so.
+
+    .PARAMETER Window
+        Opens Git Watcher in a window of its own, with a title bar and a taskbar button, instead of docking it to the
+        terminal. The window stays open after you close the terminal. Running it again for a repository that has a
+        window brings that window to the front instead of opening another, unless you also pass -Follow. With -Follow,
+        the window follows this shell until the shell exits, and then keeps showing the last repository. Click the
+        repository name in the window, or press Ctrl+O, to switch it to another repository.
 
     .EXAMPLE
         Start-GitWatcher
@@ -53,6 +62,11 @@ function Start-GitWatcher {
         Shows the current directory's repository, and changes to another one when you cd into it.
 
     .EXAMPLE
+        Start-GitWatcher -Window
+
+        Shows the current directory's repository in a window of its own.
+
+    .EXAMPLE
         Set-Alias gw Start-GitWatcher
 
         Add this to your PowerShell profile to open the overlay by typing gw.
@@ -60,7 +74,8 @@ function Start-GitWatcher {
     [CmdletBinding()]
     param(
         [string]$Path = (Get-Location).Path,
-        [switch]$Follow
+        [switch]$Follow,
+        [switch]$Window
     )
 
     $ErrorActionPreference = 'Stop'
@@ -106,7 +121,13 @@ function Start-GitWatcher {
         $repositoryPath += '.'
     }
 
-    $arguments = "--repo `"$repositoryPath`" --shell-process $PID"
+    # The app finds this terminal's window through the console of its parent process, which is this shell. Passing
+    # the shell's process ID closes the overlay when this shell (or its tab) closes. A standalone window needs neither.
+    $arguments = if ($Window) {
+        "--repo `"$repositoryPath`" --window"
+    } else {
+        "--repo `"$repositoryPath`" --shell-process $PID"
+    }
 
     if ($Follow) {
         # One file per shell, named for it, which the hook rewrites as this shell changes folders.
@@ -128,8 +149,6 @@ function Start-GitWatcher {
         $arguments += " --follow-file `"$($script:followFile)`""
     }
 
-    # The app finds this terminal's window through the console of its parent process, which is this shell. Passing
-    # the shell's process ID closes the overlay when this shell (or its tab) closes.
     Start-Process -FilePath $executable `
         -ArgumentList $arguments `
         -WorkingDirectory (Split-Path $executable)

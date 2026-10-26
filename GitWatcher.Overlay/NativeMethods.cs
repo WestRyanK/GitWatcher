@@ -8,8 +8,10 @@ namespace GitWatcher.Overlay;
 internal static class NativeMethods
 {
     public const uint AttachParentProcess = unchecked((uint)-1);
+    public const int AllowSetForegroundAnyProcess = -1;
     public const uint GetAncestorRootOwner = 3;
     public const int DwmExtendedFrameBounds = 9;
+    public const int DwmUseImmersiveDarkMode = 20;
     public const int DwmWindowCornerPreference = 33;
     public const int DwmCornerDoNotRound = 1;
     public const int DwmCornerRoundSmall = 3;
@@ -124,6 +126,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(nint window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AllowSetForegroundWindow(int processId);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

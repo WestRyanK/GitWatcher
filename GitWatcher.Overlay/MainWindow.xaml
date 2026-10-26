@@ -125,7 +125,7 @@
             <!-- A small commit graph: two commits on one line and a branch merging into it. -->
             <Path Width="16"
                   Height="16"
-                  Data="M5,2.25 A1.75,1.75 0 1 1 5,5.75 A1.75,1.75 0 1 1 5,2.25 M5,10.25 A1.75,1.75 0 1 1 5,13.75 A1.75,1.75 0 1 1 5,10.25 M11,5.25 A1.75,1.75 0 1 1 11,8.75 A1.75,1.75 0 1 1 11,5.25 M5,5.75 L5,10.25 M11,8.75 C11,10.5 5,9 5,10.25"
+                  Data="{StaticResource CommitGraphGlyph}"
                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                   StrokeThickness="1.5" />
         </Button>

@@ -7,12 +7,14 @@ using Microsoft.Win32;
 namespace GitWatcher.Overlay;
 
 /// <summary>
-/// Docks Git Watcher to the right side of the terminal window that started it.
+/// Docks Git Watcher to the right side of the terminal window that started it, or with <c>--window</c>, opens it in a
+/// window of its own.
 /// </summary>
 public partial class App : Application
 {
     private GitWatcherServer? _server;
     private string? _followFile;
+    private WindowFolder? _windowFolder;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -36,6 +38,23 @@ public partial class App : Application
 
         _followFile = options.FollowFile;
 
+        if (options.Standalone)
+        {
+            // Another window for the same repository comes to the front instead.
+            _windowFolder = await WindowFolder.OpenAsync(options.RepositoryPath, options.FollowFile);
+            if (_windowFolder is null)
+            {
+                Shutdown();
+                return;
+            }
+
+            StandaloneWindow standalone = new(WindowSettings.Load(), _windowFolder);
+            MainWindow = standalone;
+            standalone.Show();
+            await StartServerAsync(options, _windowFolder.FollowFile, standalone.ShowViewer, standalone.ShowMessage);
+            return;
+        }
+
         TerminalWindow? terminal = TerminalWindow.Find(options.TerminalWindow);
         if (terminal is null)
         {
@@ -47,24 +66,33 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
         CloseWhenShellExits(options.ShellProcessId, window);
-
-        try
-        {
-            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath, options.FollowFile);
-            window.ShowViewer(_server.Address);
-        }
-        catch (Exception exception)
-        {
-            // Startup failures (no Node.js, no WebView2 runtime, a server error) are shown in the overlay itself.
-            window.ShowMessage(exception.Message);
-        }
+        await StartServerAsync(options, options.FollowFile, window.ShowViewer, window.ShowMessage);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _server?.Dispose();
+        _windowFolder?.Dispose();
         DeleteFollowFile();
         base.OnExit(e);
+    }
+
+    /// <summary>Whether Windows uses the light app mode, which the app's colors follow.</summary>
+    internal static bool UsesLightTheme { get; private set; }
+
+    private async Task StartServerAsync(
+        OverlayOptions options, string? followFile, Action<Uri> showViewer, Action<string> showMessage)
+    {
+        try
+        {
+            _server = await GitWatcherServer.StartAsync(options.ServerScript, options.RepositoryPath, followFile);
+            showViewer(_server.Address);
+        }
+        catch (Exception exception)
+        {
+            // Startup failures (no Node.js, no WebView2 runtime, a server error) are shown in the window itself.
+            showMessage(exception.Message);
+        }
     }
 
     // The shell only writes its folder while the file exists, so deleting it stops a closed overlay's shell from
@@ -113,7 +141,7 @@ public partial class App : Application
     // Matches the viewer page's colors, which follow the Windows light or dark app mode.
     private void ApplyTheme()
     {
-        bool useLightTheme = Registry.GetValue(
+        bool useLightTheme = UsesLightTheme = Registry.GetValue(
             @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
             "AppsUseLightTheme",
             1) is not int value || value != 0;

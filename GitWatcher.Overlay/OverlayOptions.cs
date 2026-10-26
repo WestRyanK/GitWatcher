@@ -8,11 +8,17 @@ namespace GitWatcher.Overlay;
 /// <c>--repo &lt;path&gt;</c> (default: the current directory),
 /// <c>--server &lt;path to server.js&gt;</c> (default: found above this program's folder),
 /// <c>--terminal-window &lt;hwnd&gt;</c> (default: the window of the console that started this program),
-/// <c>--shell-process &lt;pid&gt;</c> (close the overlay when that process exits), and
-/// <c>--follow-file &lt;path&gt;</c> (show the repository of the folder the shell writes to that file).
+/// <c>--shell-process &lt;pid&gt;</c> (close the overlay when that process exits),
+/// <c>--follow-file &lt;path&gt;</c> (show the repository of the folder the shell writes to that file), and
+/// <c>--window</c> (open in a window of its own instead of docking to the terminal).
 /// </summary>
 internal sealed record OverlayOptions(
-    string RepositoryPath, string ServerScript, nint TerminalWindow, int? ShellProcessId, string? FollowFile)
+    string RepositoryPath,
+    string ServerScript,
+    nint TerminalWindow,
+    int? ShellProcessId,
+    string? FollowFile,
+    bool Standalone)
 {
     public static OverlayOptions Parse(string[] args)
     {
@@ -21,10 +27,17 @@ internal sealed record OverlayOptions(
         nint terminalWindow = 0;
         int? shellProcessId = null;
         string? followFile = null;
+        bool standalone = false;
 
         for (int index = 0; index < args.Length; index++)
         {
             string name = args[index];
+            if (name == "--window")
+            {
+                standalone = true;
+                continue;
+            }
+
             if (index + 1 >= args.Length)
             {
                 throw new ArgumentException($"Missing a value after {name}.");
@@ -65,7 +78,7 @@ internal sealed record OverlayOptions(
             throw new ArgumentException($"The folder {repositoryPath} doesn't exist.");
         }
 
-        return new OverlayOptions(repositoryPath, serverScript, terminalWindow, shellProcessId, followFile);
+        return new OverlayOptions(repositoryPath, serverScript, terminalWindow, shellProcessId, followFile, standalone);
     }
 
     private static nint ParseHandle(string value)

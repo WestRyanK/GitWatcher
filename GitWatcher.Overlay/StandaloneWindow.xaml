@@ -1,0 +1,21 @@
+<Window x:Class="GitWatcher.Overlay.StandaloneWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Width="1100"
+        Height="760"
+        MinWidth="320"
+        MinHeight="240"
+        Title="Git Watcher"
+        Background="{DynamicResource OverlayBackground}"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <TextBlock x:Name="MessageText"
+                   Margin="16"
+                   Foreground="{DynamicResource OverlayForeground}"
+                   Text="Starting the Git Watcher server…"
+                   TextWrapping="Wrap" />
+        <wv2:WebView2 x:Name="Viewer"
+                      Visibility="Collapsed" />
+    </Grid>
+</Window>
