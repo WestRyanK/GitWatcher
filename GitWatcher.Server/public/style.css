@@ -131,6 +131,32 @@ body {
     text-decoration: underline;
 }
 
+/* In the standalone window, the repository name is a button that opens the folder menu. */
+.folder-switcher {
+    margin: -2px -6px;
+    padding: 2px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.folder-switcher::after {
+    content: ' ▾';
+    color: var(--muted);
+    font-weight: normal;
+}
+
+.folder-switcher:hover,
+.folder-switcher:focus-visible,
+.folder-switcher.context-target {
+    background: var(--bg-hover);
+    outline: none;
+}
+
 /* Shown under the toolbar while the repository's folder is missing; the panes below it are left over and dimmed. */
 .repo-banner {
     display: flex;
@@ -1201,6 +1227,38 @@ body.resizing.resizing-rows {
 .context-menu-check {
     display: inline-block;
     width: 18px;
+    vertical-align: top;
+}
+
+/* An item with a second line or a shortcut: the folder menu's folders and Open folder. */
+.context-menu-text {
+    display: inline-flex;
+    flex-direction: column;
+    max-width: 480px;
+    vertical-align: top;
+}
+
+.context-menu-detail {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 0.9em;
+    text-overflow: ellipsis;
+}
+
+.context-menu-shortcut {
+    float: right;
+    margin-left: 24px;
+    color: var(--muted);
+    font: inherit;
+}
+
+.context-menu-heading {
+    padding: 6px 10px 2px 28px;
+    color: var(--muted);
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .context-menu-separator {

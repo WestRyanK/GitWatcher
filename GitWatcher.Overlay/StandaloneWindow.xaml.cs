@@ -1,9 +1,11 @@
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Win32;
 
 namespace GitWatcher.Overlay;
 
@@ -12,20 +14,28 @@ namespace GitWatcher.Overlay;
 /// </summary>
 public partial class StandaloneWindow : Window
 {
+    // The settings when the window opened. Changes are saved with WindowSettings.Update, so they don't overwrite other
+    // windows' changes.
     private readonly WindowSettings _settings;
+    private readonly WindowFolder _folder;
     private Uri? _viewerAddress;
 
     // Covering the whole monitor, after the page's F11. The window's state before it, to go back to.
     private bool _fullScreen;
     private WindowState _stateBeforeFullScreen;
 
-    internal StandaloneWindow(WindowSettings settings)
+    internal StandaloneWindow(WindowSettings settings, WindowFolder folder)
     {
         _settings = settings;
+        _folder = folder;
         InitializeComponent();
         Icon = CreateIcon();
         ApplySavedBounds(settings);
         SourceInitialized += OnSourceInitialized;
+
+        // Starting Git Watcher again for this window's repository, or switching another window to it, shows this
+        // window instead.
+        folder.Requested += (_, _) => Dispatcher.BeginInvoke(BringToFront);
 
         // The page is the window's only content, so it gets the keyboard whenever the window does.
         Activated += (_, _) => FocusViewer();
@@ -51,8 +61,7 @@ public partial class StandaloneWindow : Window
         MessageText.Visibility = Visibility.Visible;
     }
 
-    // For starting Git Watcher again for the same repository, which shows this window instead of another one.
-    internal void BringToFront()
+    private void BringToFront()
     {
         if (WindowState == WindowState.Minimized)
         {
@@ -94,11 +103,15 @@ public partial class StandaloneWindow : Window
         Viewer.CoreWebView2.NewWindowRequested += ViewerHost.OpenInBrowser;
         FocusViewer();
 
-        // The page's title names the repository, which changes when the window follows a shell.
+        // The page's title names the repository, which changes when the window follows a shell or switches.
         Viewer.CoreWebView2.DocumentTitleChanged += (_, _) => Title = Viewer.CoreWebView2.DocumentTitle;
+
+        // The page forgets the recent folders when it reloads, so send them with every load.
+        Viewer.CoreWebView2.NavigationCompleted += (_, _) => SendFolders();
     }
 
-    // The page sends "fullscreen" for F11. It has no minimize or close buttons here, so that's all it sends.
+    // The page sends "fullscreen" for F11, "chooseFolder" for its Open folder item and Ctrl+O, and { openFolder } for
+    // a recent folder or a worktree. It has no minimize or close buttons here.
     private void OnViewerWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         if (!ViewerHost.IsFromViewer(e, _viewerAddress))
@@ -107,10 +120,73 @@ public partial class StandaloneWindow : Window
         }
 
         using JsonDocument message = JsonDocument.Parse(e.WebMessageAsJson);
-        if (message.RootElement.ValueKind == JsonValueKind.String && message.RootElement.GetString() == "fullscreen")
+        JsonElement root = message.RootElement;
+        if (root.ValueKind == JsonValueKind.String)
         {
-            ToggleFullScreen();
+            string? command = root.GetString();
+            if (command == "fullscreen")
+            {
+                ToggleFullScreen();
+            }
+            else if (command == "chooseFolder")
+            {
+                ChooseFolder();
+            }
         }
+        else if (root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("openFolder", out JsonElement folder)
+            && folder.ValueKind == JsonValueKind.String)
+        {
+            OpenFolder(folder.GetString()!, fromList: true);
+        }
+    }
+
+    // Tells the page the recent folders for its folder menu, and whether the window follows its shell.
+    private void SendFolders()
+    {
+        if (Viewer.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var folders = new { recent = WindowSettings.Load().RecentFolders, following = _folder.Following };
+        Viewer.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new { folders }));
+    }
+
+    private void ChooseFolder()
+    {
+        OpenFolderDialog dialog = new()
+        {
+            Title = "Open a repository in this window",
+            InitialDirectory = _folder.Current is string current ? Path.GetDirectoryName(current) : null,
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            OpenFolder(dialog.FolderName, fromList: false);
+        }
+    }
+
+    // A folder from the menu's lists may have been moved or deleted since; it's taken off the recent folders then.
+    private async void OpenFolder(string folder, bool fromList)
+    {
+        FolderSwitch result = await _folder.SwitchToAsync(folder);
+        if (result == FolderSwitch.Switched)
+        {
+            // Have the page load the new repository now, instead of on its next refresh.
+            Viewer.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new { folderChanged = true }));
+        }
+        else if (result == FolderSwitch.NotRepository)
+        {
+            if (fromList)
+            {
+                WindowSettings.Update(settings => settings.RecentFolders.RemoveAll(recent => GitFolder.AreSame(recent, folder)));
+            }
+
+            string reason = Directory.Exists(folder) ? "isn't in a git repository" : "doesn't exist anymore";
+            MessageBox.Show(this, $"{folder} {reason}.", "Git Watcher", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        SendFolders();
     }
 
     // A maximized window without a frame covers the taskbar too. It has to be restored first, or Windows keeps the
@@ -162,16 +238,19 @@ public partial class StandaloneWindow : Window
     private void SaveBounds()
     {
         Rect bounds = RestoreBounds;
-        if (!bounds.IsEmpty)
+        bool maximized = (_fullScreen ? _stateBeforeFullScreen : WindowState) == WindowState.Maximized;
+        WindowSettings.Update(settings =>
         {
-            _settings.Left = bounds.Left;
-            _settings.Top = bounds.Top;
-            _settings.Width = bounds.Width;
-            _settings.Height = bounds.Height;
-        }
+            if (!bounds.IsEmpty)
+            {
+                settings.Left = bounds.Left;
+                settings.Top = bounds.Top;
+                settings.Width = bounds.Width;
+                settings.Height = bounds.Height;
+            }
 
-        _settings.Maximized = (_fullScreen ? _stateBeforeFullScreen : WindowState) == WindowState.Maximized;
-        _settings.Save();
+            settings.Maximized = maximized;
+        });
     }
 
     // Draws the commit graph glyph for the title bar and the taskbar, in blue.

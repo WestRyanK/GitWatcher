@@ -990,6 +990,9 @@ function createBranchItem(branch, displayName = branch.name, depth = 0) {
     item.dataset.refName = branch.name;
     // Only local branches have a current flag.
     item.dataset.kind = 'current' in branch ? 'local' : 'remote';
+    if (branch.worktree) {
+        item.dataset.worktree = branch.worktree;
+    }
     item.classList.toggle('current', Boolean(branch.current));
     item.classList.toggle('selected', branch.name === state.selectedBranch);
     item.title = [
@@ -1642,7 +1645,8 @@ function closeContextMenu() {
     contextMenu.target = null;
 }
 
-// Items are { label, action } objects, with `checked` for an item that can be on or off, or 'separator'.
+// Items are { label, action } objects, with `checked` for an item that can be on or off, `detail` for a second,
+// muted line, and `shortcut` for its key; 'separator'; or { heading } for a label over the items after it.
 function openContextMenu(event, target, items) {
     event.preventDefault();
     closeContextMenu();
@@ -1656,17 +1660,38 @@ function openContextMenu(event, target, items) {
             contextMenu.element.appendChild(separator);
             continue;
         }
+        if (item.heading) {
+            contextMenu.element.appendChild(createElement('div', 'context-menu-heading', item.heading));
+            continue;
+        }
         const button = createElement('button', 'context-menu-item');
         button.type = 'button';
         if (item.checked === undefined) {
             button.setAttribute('role', 'menuitem');
+            // Lines up with the checkable items' labels, in a menu that has both.
+            if (items.some((other) => other.checked !== undefined)) {
+                button.appendChild(createElement('span', 'context-menu-check'));
+            }
         } else {
             // A checkable item shows a check mark when it's on.
             button.setAttribute('role', 'menuitemcheckbox');
             button.setAttribute('aria-checked', String(item.checked));
             button.appendChild(createElement('span', 'context-menu-check', item.checked ? '✓' : ''));
         }
-        button.appendChild(document.createTextNode(item.label));
+        if (item.detail || item.shortcut) {
+            const text = createElement('span', 'context-menu-text');
+            text.appendChild(createElement('span', 'context-menu-label', item.label));
+            if (item.detail) {
+                text.appendChild(createElement('span', 'context-menu-detail', item.detail));
+                button.title = item.detail;
+            }
+            button.appendChild(text);
+            if (item.shortcut) {
+                button.appendChild(createElement('kbd', 'context-menu-shortcut', item.shortcut));
+            }
+        } else {
+            button.appendChild(document.createTextNode(item.label));
+        }
         button.addEventListener('click', () => {
             closeContextMenu();
             item.action();
@@ -1749,11 +1774,17 @@ elements.branches.addEventListener('contextmenu', (event) => {
     const noun = kind === 'tag' ? 'tag' : 'branch';
     // A remote branch is checked out as a new local branch that tracks it. A tag is checked out as a detached HEAD.
     const checkout = kind === 'remote' ? `git checkout --track ${name}` : `git checkout ${name}`;
-    openContextMenu(event, item, [
+    const items = [
         { label: `Copy ${noun} name`, action: () => copyWithStatus(() => name, `the ${noun} name`) },
         { label: 'Go to commit', action: () => selectCommit(item.dataset.hash, true) },
         { label: 'Copy checkout command', action: () => copyWithStatus(() => checkout, `"${checkout}"`) },
-    ]);
+    ];
+    // The standalone window can switch to the worktree the branch is checked out in.
+    const worktree = item.dataset.worktree;
+    if (inStandaloneWindow && worktree) {
+        items.push('separator', { label: 'Open worktree in this window', action: () => openHostFolder(worktree) });
+    }
+    openContextMenu(event, item, items);
 });
 
 document.addEventListener('pointerdown', (event) => {
@@ -1857,8 +1888,8 @@ for (const control of rememberedControls) {
 // live in this toolbar to keep everything on one line. They ask the overlay to act through WebView2's messages. The
 // overlay's standalone window (?host=window) has a title bar with its own buttons, so it doesn't need them.
 const webViewHost = window.chrome?.webview;
+const inStandaloneWindow = Boolean(webViewHost) && new URLSearchParams(location.search).get('host') === 'window';
 if (webViewHost) {
-    const inStandaloneWindow = new URLSearchParams(location.search).get('host') === 'window';
     if (!inStandaloneWindow) {
         document.getElementById('host-controls').hidden = false;
         document.getElementById('host-minimize').addEventListener('click', () => webViewHost.postMessage('minimize'));
@@ -1904,6 +1935,119 @@ if (webViewHost) {
         if (terminalKeys.has(name)) {
             event.preventDefault();
             webViewHost.postMessage({ terminalKey: name });
+        }
+    });
+}
+
+// The standalone window can show another repository. Its repository name opens a menu of the recent repositories,
+// this repository's other worktrees, and Open folder (Ctrl+O), which shows the window's folder picker. The window
+// points the server at the chosen repository, then says so, and the page loads it. The window only switches to a
+// folder that's in a repository, and to one no other window shows.
+const hostFolders = { recent: [], following: false };
+
+// Git and Windows write the same folder differently (D:/repo, d:\repo\), so compare them loosely.
+function normalizePath(folder) {
+    return folder.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
+}
+
+function displayPath(folder) {
+    return folder.replace(/\//g, '\\').replace(/\\+$/, '');
+}
+
+function openHostFolder(folder) {
+    if (!state.data || normalizePath(folder) !== normalizePath(state.data.repoPath)) {
+        webViewHost.postMessage({ openFolder: folder });
+    }
+}
+
+function chooseHostFolder() {
+    webViewHost.postMessage('chooseFolder');
+}
+
+async function openFolderMenu() {
+    // The Branches pane loads its data only while it's open, so load it here for the worktrees otherwise.
+    let branches = state.branches;
+    if (!branches) {
+        try {
+            branches = await fetchJson('/api/branches');
+        } catch {
+            branches = null;
+        }
+    }
+
+    const current = state.data ? normalizePath(state.data.repoPath) : null;
+    const items = [];
+    const folderItem = (folder, detail) => ({
+        label: displayPath(folder).split('\\').pop(),
+        detail,
+        checked: normalizePath(folder) === current,
+        action: () => openHostFolder(folder),
+    });
+
+    if (hostFolders.following) {
+        items.push({ heading: "Following your shell's folder" });
+    }
+    if (hostFolders.recent.length > 0) {
+        items.push({ heading: 'Recent' });
+        items.push(...hostFolders.recent.map((folder) => folderItem(folder, displayPath(folder))));
+    }
+
+    // Branches checked out in another worktree name its folder. The current worktree's branch doesn't.
+    const worktrees = new Map();
+    for (const branch of branches?.local || []) {
+        if (branch.worktree && !worktrees.has(normalizePath(branch.worktree))) {
+            worktrees.set(normalizePath(branch.worktree), folderItem(branch.worktree, `${branch.name} · ${displayPath(branch.worktree)}`));
+        }
+    }
+    if (worktrees.size > 0) {
+        items.push({ heading: 'Other worktrees' });
+        items.push(...worktrees.values());
+    }
+
+    if (items.length > 0) {
+        items.push('separator');
+    }
+    items.push({ label: 'Open folder…', shortcut: 'Ctrl+O', action: chooseHostFolder });
+
+    const rect = elements.repoName.getBoundingClientRect();
+    openContextMenu({ preventDefault() {}, clientX: rect.left, clientY: rect.bottom + 4 }, elements.repoName, items);
+}
+
+if (inStandaloneWindow) {
+    // The repository name becomes a button that opens the folder menu.
+    const switcher = createElement('button', 'repo-name folder-switcher', elements.repoName.textContent);
+    switcher.id = 'repo-name';
+    switcher.type = 'button';
+    switcher.title = 'Switch to another repository';
+    switcher.setAttribute('aria-haspopup', 'menu');
+    switcher.addEventListener('click', openFolderMenu);
+    elements.repoName.replaceWith(switcher);
+    elements.repoName = switcher;
+
+    const openFolderShortcut = document.getElementById('shortcut-open-folder');
+    openFolderShortcut.hidden = false;
+    openFolderShortcut.nextElementSibling.hidden = false;
+
+    // Ctrl+O works anywhere on the page, even in a text box, as it does in other apps.
+    document.addEventListener('keydown', (event) => {
+        const otherModifiers = event.altKey || event.shiftKey || event.metaKey;
+        if (event.ctrlKey && !otherModifiers && event.key.toLowerCase() === 'o') {
+            event.preventDefault();
+            chooseHostFolder();
+        }
+    });
+
+    webViewHost.addEventListener('message', (event) => {
+        if (event.data?.folders) {
+            hostFolders.recent = Array.isArray(event.data.folders.recent) ? event.data.folders.recent : [];
+            hostFolders.following = Boolean(event.data.folders.following);
+        }
+        if (event.data?.folderChanged) {
+            // The branches belong to the last repository, so the folder menu mustn't use them.
+            state.branches = null;
+            loadGraph();
+            loadWorkingTree();
+            loadBranches();
         }
     });
 }

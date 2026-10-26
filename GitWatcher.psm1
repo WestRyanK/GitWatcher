@@ -46,9 +46,10 @@ function Start-GitWatcher {
 
     .PARAMETER Window
         Opens Git Watcher in a window of its own, with a title bar and a taskbar button, instead of docking it to the
-        terminal. The window stays open after you close the terminal. Running it again for the same folder brings
-        that folder's window to the front instead of opening another, unless you also pass -Follow. With -Follow, the
-        window follows this shell until the shell exits, and then keeps showing the last repository.
+        terminal. The window stays open after you close the terminal. Running it again for a repository that has a
+        window brings that window to the front instead of opening another, unless you also pass -Follow. With -Follow,
+        the window follows this shell until the shell exits, and then keeps showing the last repository. Click the
+        repository name in the window, or press Ctrl+O, to switch it to another repository.
 
     .EXAMPLE
         Start-GitWatcher

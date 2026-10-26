@@ -86,13 +86,19 @@ Start-GitWatcher -Window
 ```
 
 It works from any shell, not only Windows Terminal, and the window stays open after you close the terminal. Closing
-the window stops the viewer. Running it again for the same folder brings that folder's window to the front instead of
-opening another one. With `-Follow` too, the window follows your shell's folder until the shell exits, then keeps
-showing the last repository, and a new window opens each time.
+the window stops the viewer. Each repository (or worktree) has at most one window: running it again for a repository
+that has one brings that window to the front instead of opening another. With `-Follow` too, the window follows your
+shell's folder until the shell exits, then keeps showing the last repository, and a new window opens each time.
 
+* **Switching repositories:** click the repository name at the top left for a menu of your **Recent** repositories,
+  this repository's **Other worktrees**, and **Open folder…** (Ctrl+O), which shows the Windows folder picker. The
+  window switches without restarting, and the list of recent repositories keeps the last 10. Right-click a branch
+  that's checked out in another worktree and choose **Open worktree in this window** to switch to that worktree. A
+  repository that another window shows brings that window to the front instead, and a folder outside any repository
+  isn't opened. Picking a repository in a window that follows your shell stops it following.
 * **Full screen:** F11 makes the window cover its screen, and F11 again puts it back.
-* The window's size, position, and maximized state are saved in `~/.git-watcher/window.json`, so it opens where you
-  left it.
+* The window's size, position, maximized state, and recent repositories are saved in `~/.git-watcher/window.json`, so
+  it opens where you left it.
 
 ### In a browser
 
@@ -280,6 +286,11 @@ version and asks you to close every panel. The next run then rebuilds it.
   server when it closes. The server also exits on its own if the panel's process goes away. The page settings are
   shared with the browser view.
 * `--window` (from `Start-GitWatcher -Window`) shows the same page in a `StandaloneWindow` instead, with none of the
-  docking. The page loads with `?host=window`, which hides the panel's own minimize and close buttons. Each folder's
-  window has a named event: a second start for the same folder signals it, lets it take the foreground with
-  `AllowSetForegroundWindow`, and exits.
+  docking. The page loads with `?host=window`, which hides the panel's own minimize and close buttons and turns the
+  repository name into the folder menu. Each repository's window holds a named event: starting or switching another
+  window to that repository signals it, lets it take the foreground with `AllowSetForegroundWindow`, and gives up.
+* The window's server follows a temporary file of the window's own, the same way a docked panel's server follows its
+  shell's file. Switching repositories rewrites that file, so the server moves without restarting, and the window
+  tells the page to load the new repository. With `-Follow`, the window copies the shell's file into its own until
+  you pick a repository. The page only asks the window to switch, through WebView2's messages; the server has no way
+  to be pointed at another folder over HTTP.
