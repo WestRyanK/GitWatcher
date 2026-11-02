@@ -1404,7 +1404,22 @@ function buildTodoLine(command) {
 
 const maxTodoLines = 5;
 
-// The rebase or bisect git is in the middle of, with what's been done, what's next, and the commands to go on.
+// The first few commands still to come in a rebase, cherry-pick, or revert.
+function appendTodo(section, remaining) {
+    if (remaining.length === 0) {
+        return;
+    }
+    section.appendChild(createElement('div', 'operation-label', `Next (${remaining.length})`));
+    for (const command of remaining.slice(0, maxTodoLines)) {
+        section.appendChild(buildTodoLine(command));
+    }
+    if (remaining.length > maxTodoLines) {
+        section.appendChild(createElement('div', 'operation-todo muted', `and ${remaining.length - maxTodoLines} more`));
+    }
+}
+
+// The rebase, cherry-pick, revert, merge, or bisect git is in the middle of, with what's been done, what's next, and
+// the commands to go on.
 function buildOperation(operation, conflictCount) {
     const section = createElement('div', 'operation');
     let title;
@@ -1434,6 +1449,27 @@ function buildOperation(operation, conflictCount) {
         } else if (operation.startCommit) {
             section.appendChild(buildCommitLine('Started on', operation.startCommit));
         }
+    } else if (operation.type === 'merge') {
+        title = 'Merging';
+        if (operation.message) {
+            section.appendChild(buildTextLine('Message', operation.message));
+        }
+        for (const commit of operation.commits) {
+            section.appendChild(buildCommitLine('From', commit));
+        }
+        hint = conflictCount > 0
+            ? 'Resolve the conflicts and stage them, then git commit. Or git merge --abort.'
+            : 'git commit to finish the merge, or git merge --abort.';
+    } else if (operation.type === 'cherry-pick' || operation.type === 'revert') {
+        const command = `git ${operation.type}`;
+        title = operation.type === 'revert' ? 'Reverting' : 'Cherry-picking';
+        if (operation.current) {
+            section.appendChild(buildCommitLine('Stopped at', operation.current));
+        }
+        appendTodo(section, operation.remaining);
+        hint = conflictCount > 0
+            ? `Resolve the conflicts and stage them, then ${command} --continue. Or --skip or --abort.`
+            : `${command} --continue to go on, or --abort to stop.`;
     } else {
         const name = operation.type === 'am' ? 'Applying patches' : 'Rebasing';
         const progress = operation.step && operation.total ? ` (${operation.step}/${operation.total})` : '';
@@ -1446,15 +1482,7 @@ function buildOperation(operation, conflictCount) {
         } else if (operation.current) {
             section.appendChild(buildTextLine('Last', operation.current, 'mono'));
         }
-        if (operation.remaining.length > 0) {
-            section.appendChild(createElement('div', 'operation-label', `Next (${operation.remaining.length})`));
-            for (const command of operation.remaining.slice(0, maxTodoLines)) {
-                section.appendChild(buildTodoLine(command));
-            }
-            if (operation.remaining.length > maxTodoLines) {
-                section.appendChild(createElement('div', 'operation-todo muted', `and ${operation.remaining.length - maxTodoLines} more`));
-            }
-        }
+        appendTodo(section, operation.remaining);
         const command = operation.type === 'am' ? 'git am' : 'git rebase';
         hint = conflictCount > 0
             ? `Resolve the conflicts and stage them, then ${command} --continue. Or --skip or --abort.`

@@ -512,15 +512,60 @@ function parseTodo(text) {
     return (text || '').split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
 }
 
-// What git is in the middle of: a rebase or a bisect, read from the state files git keeps in its folder while they
-// run. Returns null when there's neither.
+// What git is in the middle of: a rebase, cherry-pick, revert, merge, or bisect, read from the state files git keeps
+// in its folder while they run. Returns null when there's none.
 async function getOperation() {
     const gitDirOutput = await runGitOrNull(['rev-parse', '--absolute-git-dir']);
     if (!gitDirOutput) {
         return null;
     }
     const gitDir = path.resolve(repoRoot, gitDirOutput);
-    return (await getRebase(gitDir)) || (await getBisect(gitDir));
+    return (await getRebase(gitDir))
+        || (await getCherryPickOrRevert(gitDir))
+        || (await getMerge(gitDir))
+        || (await getBisect(gitDir));
+}
+
+// See git-cherry-pick(1) and git-revert(1). CHERRY_PICK_HEAD or REVERT_HEAD is the commit that stopped, and when
+// several commits were given, sequencer/todo lists it first, followed by the rest still to come.
+async function getCherryPickOrRevert(gitDir) {
+    const [cherryPickHead, revertHead, todo] = await Promise.all([
+        readGitFile(gitDir, 'CHERRY_PICK_HEAD'),
+        readGitFile(gitDir, 'REVERT_HEAD'),
+        readGitFile(gitDir, 'sequencer', 'todo'),
+    ]);
+    const remaining = parseTodo(todo);
+    if (cherryPickHead === null && revertHead === null && remaining.length === 0) {
+        return null;
+    }
+
+    const currentHash = cherryPickHead ?? revertHead;
+    let type;
+    if (currentHash !== null) {
+        type = cherryPickHead !== null ? 'cherry-pick' : 'revert';
+    } else {
+        // The commit that stopped was committed by hand, and the rest are waiting for --continue.
+        type = remaining[0].startsWith('revert') ? 'revert' : 'cherry-pick';
+    }
+    const firstHash = remaining[0]?.split(' ')[1];
+    if (currentHash && firstHash && currentHash.startsWith(firstHash)) {
+        remaining.shift();
+    }
+    return { type, current: await describeCommit(currentHash), remaining };
+}
+
+// See git-merge(1). MERGE_HEAD lists the commits being merged, more than one for an octopus merge.
+async function getMerge(gitDir) {
+    const mergeHead = await readGitFile(gitDir, 'MERGE_HEAD');
+    if (mergeHead === null) {
+        return null;
+    }
+    const message = await readGitFile(gitDir, 'MERGE_MSG');
+    return {
+        type: 'merge',
+        commits: await Promise.all(mergeHead.split(/\s+/).filter(Boolean).map((hash) => describeCommit(hash))),
+        message: message ? message.split('\n')[0] : null,
+    };
 }
 
 // See git-rebase(1). An interactive or merge rebase keeps its state in rebase-merge, and git am (and the old apply
