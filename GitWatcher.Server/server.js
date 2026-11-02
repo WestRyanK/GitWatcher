@@ -473,7 +473,193 @@ async function getStatus() {
             }
         }
     }
+    status.operation = await getOperation().catch(() => null);
     return status;
+}
+
+// Reads one of git's state files from the repository's git folder, or returns null when it isn't there.
+async function readGitFile(gitDir, ...parts) {
+    try {
+        return (await fs.promises.readFile(path.join(gitDir, ...parts), 'utf8')).trim();
+    } catch {
+        return null;
+    }
+}
+
+// A short description of a commit: its short hash, subject, and the branches that point at it.
+async function describeCommit(hash) {
+    if (!hash) {
+        return null;
+    }
+    const [log, names] = await Promise.all([
+        runGitOrNull(['log', '-1', `--format=%h${fieldSeparator}%s`, hash, '--']),
+        runGitOrNull(['for-each-ref', '--format=%(refname:short)', `--points-at=${hash}`, 'refs/heads', 'refs/remotes']),
+    ]);
+    if (log === null) {
+        return { hash, shortHash: hash.slice(0, 8), subject: null, refs: [] };
+    }
+    const [shortHash, subject] = log.split(fieldSeparator);
+    return {
+        hash,
+        shortHash,
+        subject,
+        refs: names ? names.split('\n').filter((name) => name && !name.endsWith('/HEAD')) : [],
+    };
+}
+
+// Lists a rebase's todo-file commands, skipping comments and blank lines.
+function parseTodo(text) {
+    return (text || '').split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
+}
+
+// What git is in the middle of: a rebase, cherry-pick, revert, merge, or bisect, read from the state files git keeps
+// in its folder while they run. Returns null when there's none.
+async function getOperation() {
+    const gitDirOutput = await runGitOrNull(['rev-parse', '--absolute-git-dir']);
+    if (!gitDirOutput) {
+        return null;
+    }
+    const gitDir = path.resolve(repoRoot, gitDirOutput);
+    return (await getRebase(gitDir))
+        || (await getCherryPickOrRevert(gitDir))
+        || (await getMerge(gitDir))
+        || (await getBisect(gitDir));
+}
+
+// See git-cherry-pick(1) and git-revert(1). CHERRY_PICK_HEAD or REVERT_HEAD is the commit that stopped, and when
+// several commits were given, sequencer/todo lists it first, followed by the rest still to come.
+async function getCherryPickOrRevert(gitDir) {
+    const [cherryPickHead, revertHead, todo] = await Promise.all([
+        readGitFile(gitDir, 'CHERRY_PICK_HEAD'),
+        readGitFile(gitDir, 'REVERT_HEAD'),
+        readGitFile(gitDir, 'sequencer', 'todo'),
+    ]);
+    const remaining = parseTodo(todo);
+    if (cherryPickHead === null && revertHead === null && remaining.length === 0) {
+        return null;
+    }
+
+    const currentHash = cherryPickHead ?? revertHead;
+    let type;
+    if (currentHash !== null) {
+        type = cherryPickHead !== null ? 'cherry-pick' : 'revert';
+    } else {
+        // The commit that stopped was committed by hand, and the rest are waiting for --continue.
+        type = remaining[0].startsWith('revert') ? 'revert' : 'cherry-pick';
+    }
+    const firstHash = remaining[0]?.split(' ')[1];
+    if (currentHash && firstHash && currentHash.startsWith(firstHash)) {
+        remaining.shift();
+    }
+    return { type, current: await describeCommit(currentHash), remaining };
+}
+
+// See git-merge(1). MERGE_HEAD lists the commits being merged, more than one for an octopus merge.
+async function getMerge(gitDir) {
+    const mergeHead = await readGitFile(gitDir, 'MERGE_HEAD');
+    if (mergeHead === null) {
+        return null;
+    }
+    const message = await readGitFile(gitDir, 'MERGE_MSG');
+    return {
+        type: 'merge',
+        commits: await Promise.all(mergeHead.split(/\s+/).filter(Boolean).map((hash) => describeCommit(hash))),
+        message: message ? message.split('\n')[0] : null,
+    };
+}
+
+// See git-rebase(1). An interactive or merge rebase keeps its state in rebase-merge, and git am (and the old apply
+// backend of git rebase) in rebase-apply.
+async function getRebase(gitDir) {
+    for (const folder of ['rebase-merge', 'rebase-apply']) {
+        const headName = await readGitFile(gitDir, folder, 'head-name');
+        const onto = await readGitFile(gitDir, folder, 'onto');
+        const applying = folder === 'rebase-apply' && (await readGitFile(gitDir, folder, 'applying')) !== null;
+        if (headName === null && onto === null && !applying) {
+            continue;
+        }
+
+        const read = (name) => readGitFile(gitDir, folder, name);
+        const merge = folder === 'rebase-merge';
+        const [step, total, todo, done, stoppedSha, ontoCommit] = await Promise.all([
+            read(merge ? 'msgnum' : 'next'),
+            read(merge ? 'end' : 'last'),
+            merge ? read('git-rebase-todo') : null,
+            merge ? read('done') : null,
+            merge ? read('stopped-sha') : null,
+            describeCommit(onto),
+        ]);
+        const doneLines = parseTodo(done);
+        return {
+            type: applying ? 'am' : 'rebase',
+            branch: headName && headName !== 'detached HEAD' ? headName.replace(/^refs\/heads\//, '') : null,
+            onto: ontoCommit,
+            step: step ? Number(step) : null,
+            total: total ? Number(total) : null,
+            // The command git stopped at, such as "edit 1a2b3c4 Fix it", and the commit it was picking.
+            current: doneLines.length > 0 ? doneLines[doneLines.length - 1] : null,
+            stopped: await describeCommit(stoppedSha),
+            remaining: parseTodo(todo),
+        };
+    }
+    return null;
+}
+
+// See git-bisect(1). BISECT_START holds the branch or commit the bisect started from, BISECT_TERMS the words used for
+// bad and good, and refs/bisect the commits marked so far.
+async function getBisect(gitDir) {
+    const start = await readGitFile(gitDir, 'BISECT_START');
+    if (start === null) {
+        return null;
+    }
+    const terms = (await readGitFile(gitDir, 'BISECT_TERMS'))?.split('\n').map((term) => term.trim()) || [];
+    const badTerm = terms[0] || 'bad';
+    const goodTerm = terms[1] || 'good';
+
+    const refsOutput = await runGitOrNull(['for-each-ref', '--format=%(refname)%09%(objectname)', 'refs/bisect']);
+    let bad = null;
+    const good = [];
+    const skipped = [];
+    for (const line of (refsOutput || '').split('\n')) {
+        const [refName, hash] = line.split('\t');
+        if (refName === `refs/bisect/${badTerm}`) {
+            bad = hash;
+        } else if (refName?.startsWith(`refs/bisect/${goodTerm}-`)) {
+            good.push(hash);
+        } else if (refName?.startsWith('refs/bisect/skip-')) {
+            skipped.push(hash);
+        }
+    }
+
+    // How many commits could still be the first bad one, how many are left to test after HEAD, and roughly how many
+    // more steps it takes, as git bisect itself reports them.
+    let candidates = null;
+    let left = null;
+    let steps = null;
+    if (bad && good.length > 0) {
+        const vars = await runGitOrNull(['rev-list', '--bisect-vars', bad, '--not', ...good]);
+        const value = (name) => {
+            const match = new RegExp(`^${name}=(\\d+)`, 'm').exec(vars || '');
+            return match ? Number(match[1]) : null;
+        };
+        candidates = value('bisect_all');
+        left = value('bisect_nr');
+        steps = value('bisect_steps');
+    }
+
+    const isHash = /^[0-9a-f]{40,64}$/i.test(start);
+    return {
+        type: 'bisect',
+        terms: { bad: badTerm, good: goodTerm },
+        start: isHash ? null : start,
+        startCommit: isHash ? await describeCommit(start) : null,
+        bad: await describeCommit(bad),
+        good: good.length,
+        skipped: skipped.length,
+        candidates,
+        left,
+        steps,
+    };
 }
 
 async function readSettings() {

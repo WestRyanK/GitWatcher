@@ -1361,6 +1361,138 @@ function statusClass(code) {
     return /^[AMDRCT]$/.test(code) ? `status-${code === 'T' ? 'M' : code}` : '';
 }
 
+// A commit as "1a2b3c4d (main) Subject", with the hash clickable to jump to it in the graph.
+function buildCommitLine(label, commit) {
+    const line = createElement('div', 'operation-line');
+    line.appendChild(createElement('span', 'operation-label', label));
+    const hash = createElement('button', 'operation-hash mono', commit.shortHash);
+    hash.type = 'button';
+    hash.title = 'Show this commit';
+    hash.addEventListener('click', () => {
+        if (state.rowByHash.has(commit.hash)) {
+            selectCommit(commit.hash, true);
+        } else {
+            setStatus(`${commit.shortHash} isn't in the shown commits.`);
+        }
+    });
+    line.appendChild(hash);
+    const refs = commit.refs.length > 0 ? ` (${commit.refs.join(', ')})` : '';
+    if (refs || commit.subject) {
+        line.appendChild(createElement('span', 'operation-subject', `${refs} ${commit.subject || ''}`.trim()));
+    }
+    return line;
+}
+
+function buildTextLine(label, text, className = '') {
+    const line = createElement('div', 'operation-line');
+    line.appendChild(createElement('span', 'operation-label', label));
+    line.appendChild(createElement('span', className, text));
+    return line;
+}
+
+// A rebase's todo command, "pick 1a2b3c4 Subject", with its command word set apart.
+function buildTodoLine(command) {
+    const [word, ...rest] = command.split(' ');
+    if (/^[0-9a-f]{40,64}$/i.test(rest[0] || '')) {
+        rest[0] = rest[0].slice(0, 8);
+    }
+    const line = createElement('div', 'operation-todo mono');
+    line.appendChild(createElement('span', 'operation-command', word));
+    line.appendChild(document.createTextNode(` ${rest.join(' ')}`));
+    return line;
+}
+
+const maxTodoLines = 5;
+
+// The first few commands still to come in a rebase, cherry-pick, or revert.
+function appendTodo(section, remaining) {
+    if (remaining.length === 0) {
+        return;
+    }
+    section.appendChild(createElement('div', 'operation-label', `Next (${remaining.length})`));
+    for (const command of remaining.slice(0, maxTodoLines)) {
+        section.appendChild(buildTodoLine(command));
+    }
+    if (remaining.length > maxTodoLines) {
+        section.appendChild(createElement('div', 'operation-todo muted', `and ${remaining.length - maxTodoLines} more`));
+    }
+}
+
+// The rebase, cherry-pick, revert, merge, or bisect git is in the middle of, with what's been done, what's next, and
+// the commands to go on.
+function buildOperation(operation, conflictCount) {
+    const section = createElement('div', 'operation');
+    let title;
+    let hint;
+    if (operation.type === 'bisect') {
+        title = 'Bisecting';
+        if (operation.candidates === 1 && operation.bad) {
+            section.appendChild(buildCommitLine(`First ${operation.terms.bad}`, operation.bad));
+            hint = 'Found it. git bisect reset returns to where you started.';
+        } else if (operation.candidates !== null) {
+            const { left, steps } = operation;
+            section.appendChild(buildTextLine('Left', `${left} ${left === 1 ? 'revision' : 'revisions'} to test after HEAD, about ${steps} ${steps === 1 ? 'step' : 'steps'}`));
+            hint = `Test HEAD, then git bisect ${operation.terms.good} or git bisect ${operation.terms.bad}.`;
+        } else {
+            hint = `Mark a ${operation.terms.bad} commit and a ${operation.terms.good} one to start narrowing it down.`;
+        }
+        if (operation.bad && operation.candidates !== 1) {
+            section.appendChild(buildCommitLine(operation.terms.bad[0].toUpperCase() + operation.terms.bad.slice(1), operation.bad));
+        }
+        const marks = [`${operation.good} ${operation.terms.good}`];
+        if (operation.skipped > 0) {
+            marks.push(`${operation.skipped} skipped`);
+        }
+        section.appendChild(buildTextLine('Marked', marks.join(', ')));
+        if (operation.start) {
+            section.appendChild(buildTextLine('Started on', operation.start, 'mono'));
+        } else if (operation.startCommit) {
+            section.appendChild(buildCommitLine('Started on', operation.startCommit));
+        }
+    } else if (operation.type === 'merge') {
+        title = 'Merging';
+        if (operation.message) {
+            section.appendChild(buildTextLine('Message', operation.message));
+        }
+        for (const commit of operation.commits) {
+            section.appendChild(buildCommitLine('From', commit));
+        }
+        hint = conflictCount > 0
+            ? 'Resolve the conflicts and stage them, then git commit. Or git merge --abort.'
+            : 'git commit to finish the merge, or git merge --abort.';
+    } else if (operation.type === 'cherry-pick' || operation.type === 'revert') {
+        const command = `git ${operation.type}`;
+        title = operation.type === 'revert' ? 'Reverting' : 'Cherry-picking';
+        if (operation.current) {
+            section.appendChild(buildCommitLine('Stopped at', operation.current));
+        }
+        appendTodo(section, operation.remaining);
+        hint = conflictCount > 0
+            ? `Resolve the conflicts and stage them, then ${command} --continue. Or --skip or --abort.`
+            : `${command} --continue to go on, or --abort to stop.`;
+    } else {
+        const name = operation.type === 'am' ? 'Applying patches' : 'Rebasing';
+        const progress = operation.step && operation.total ? ` (${operation.step}/${operation.total})` : '';
+        title = `${name}${operation.branch ? ` ${operation.branch}` : ''}${progress}`;
+        if (operation.onto) {
+            section.appendChild(buildCommitLine('Onto', operation.onto));
+        }
+        if (operation.stopped) {
+            section.appendChild(buildCommitLine('Stopped at', operation.stopped));
+        } else if (operation.current) {
+            section.appendChild(buildTextLine('Last', operation.current, 'mono'));
+        }
+        appendTodo(section, operation.remaining);
+        const command = operation.type === 'am' ? 'git am' : 'git rebase';
+        hint = conflictCount > 0
+            ? `Resolve the conflicts and stage them, then ${command} --continue. Or --skip or --abort.`
+            : `${command} --continue to go on, or --abort to stop.`;
+    }
+    section.prepend(createElement('div', 'operation-title', title));
+    section.appendChild(createElement('div', 'operation-hint', hint));
+    return section;
+}
+
 function renderWorkingTree() {
     const data = state.workingTree;
     if (!data) {
@@ -1382,6 +1514,9 @@ function renderWorkingTree() {
         tracking = parts.length > 0 ? `${parts.join(', ')} of ${branch.upstream}` : `up to date with ${branch.upstream}`;
     }
     fragment.appendChild(createElement('p', 'status-summary', `${branchLabel} · ${tracking}`));
+    if (data.operation) {
+        fragment.appendChild(buildOperation(data.operation, data.conflicted.length));
+    }
 
     const groups = [
         { key: 'conflicted', title: 'Conflicts', files: data.conflicted, className: 'status-conflict' },

@@ -141,7 +141,12 @@ The entry is in [`.claude/launch.json`](.claude/launch.json).
     it's checked out in. Tags are grouped by slashes, by hyphens (`MyApp-v2026.10.02` under **MyApp**), or not at
     all: choose with **Group tags by** in the **Options** menu or by right-clicking the **Tags** node. Click a branch
     or tag to jump to its commit.
-  - **Status** lists conflicted, staged, unstaged, and untracked files for the folder the viewer runs in.
+  - **Status** lists conflicted, staged, unstaged, and untracked files for the folder the viewer runs in. During a
+    rebase (or `git am`), it also shows the branch being rebased, what it's going onto, the step it's on, the commit
+    it stopped at, and the commands still to come. During a bisect, it shows the bad commit, how many commits are
+    marked good or skipped, and how many revisions are left to test, or the first bad commit once it's found.
+    During a merge, it shows the commits being merged and the merge message, and during a cherry-pick or revert,
+    the commit it stopped at and the commits still to come.
 * **Diffs:** click a file in **Commit details** or in the **Status** pane to see its diff, in a view over the
   Commits pane.
   - A commit's file is compared with the commit's first parent. A Status file is compared by its group: staged

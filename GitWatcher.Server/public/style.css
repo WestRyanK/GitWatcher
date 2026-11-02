@@ -808,6 +808,72 @@ body.resizing.resizing-rows {
 .status-conflict {
     color: var(--deleted);
 }
+
+/* The rebase or bisect in progress, above the Status pane's files. */
+.operation {
+    margin: 0 6px 6px;
+    padding: 4px 8px 6px;
+    border-left: 3px solid var(--modified);
+    border-radius: 4px;
+    background: var(--bg-alt);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.operation-title {
+    margin-bottom: 2px;
+    font-weight: 600;
+    color: var(--modified);
+}
+
+.operation-line {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.operation-label {
+    flex: none;
+    color: var(--muted);
+}
+
+.operation-hash {
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--remote-fg);
+    font-size: inherit;
+    cursor: pointer;
+}
+
+.operation-hash:hover,
+.operation-hash:focus-visible {
+    text-decoration: underline;
+}
+
+.operation-subject {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.operation-todo {
+    padding-left: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.operation-command {
+    color: var(--renamed);
+}
+
+.operation-hint {
+    margin-top: 4px;
+    color: var(--muted);
+}
 .graph-scroll {
     flex: 1;
     overflow: auto;
